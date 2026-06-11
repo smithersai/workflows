@@ -1,0 +1,23 @@
+# Fetch Linear Issue
+
+Fetch the Linear issue **{props.issueId}** and return it as structured data.
+
+Use the Linear MCP tools available to you (e.g. `linear` / `get_issue` / `list_comments`) to read:
+
+- the issue identifier (e.g. `ENG-123`), title, and full description
+- the **acceptance criteria** — extract them as a clean list of individual,
+  checkable statements. Look in the description (checklists, "Acceptance
+  Criteria" / "AC" / "Done when" sections) and in comments. If none are
+  explicitly stated, derive the implied acceptance criteria from the
+  description and say so in the relevant items.
+- all comments (as plain strings, newest last)
+- labels
+- the issue's web URL
+
+Do NOT write any code or make any repository changes. This is a read-only
+fetch step.
+
+REQUIRED OUTPUT:
+{props.schema}
+
+Return ONLY raw JSON matching the required output schema.

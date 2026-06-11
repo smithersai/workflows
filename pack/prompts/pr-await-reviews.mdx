@@ -1,0 +1,50 @@
+# Await & Classify PR Reviews
+
+Monitor pull request **#{props.prNumber}** until the expected reviewers respond,
+then classify the current review state. This is a read-only monitoring step —
+do NOT modify code, do NOT comment, and NEVER merge.
+
+Expected reviewers (logins/apps that must weigh in): {props.reviewers}
+
+The latest pushed commit is **{props.headSha}**. Only consider reviews and
+comments authored **at or after** that push — earlier ones are stale and were
+already addressed.
+
+## Poll loop
+
+Poll roughly every {props.pollIntervalSec} seconds, for up to
+{props.maxAttempts} attempts (sleep between attempts). On each attempt, gather:
+
+- `gh pr view {props.prNumber} --json reviews,latestReviews,reviewDecision,comments`
+- review comments: `gh api repos/{{owner}}/{{repo}}/pulls/{props.prNumber}/comments`
+- issue comments: `gh api repos/{{owner}}/{{repo}}/issues/{props.prNumber}/comments`
+
+(Resolve `{{owner}}/{{repo}}` from `gh repo view --json nameWithOwner`.)
+
+Stop polling as soon as **every** expected reviewer AND every human who has
+left a review/comment after `{props.headSha}` has reached a terminal state
+(approved or has findings). If, after `{props.maxAttempts}` attempts, one or
+more are still `pending`, stop and report with `timedOut: true`.
+
+## Classification
+
+For each reviewer (the expected bots, plus ANY human who left a review or
+comment after the latest push):
+
+- `kind`: `bot` for app/bot accounts (e.g. claude, codex), else `human`.
+- `status`:
+  - `approved` — they approved or clearly said it's good to go / LGTM with no
+    open asks.
+  - `findings` — they requested changes or raised any unresolved issue/comment.
+  - `pending` — they have not responded after the latest push.
+- `findings`: list each concrete issue they raised (`path` if file-specific,
+  plus the `body`).
+
+Set `allResolved: true` ONLY if there are no `pending` and no `findings` across
+all reviewers (everyone approved). Put any still-pending reviewer logins in
+`pending`. Echo back `headSha`.
+
+REQUIRED OUTPUT:
+{props.schema}
+
+Return ONLY raw JSON matching the required output schema.

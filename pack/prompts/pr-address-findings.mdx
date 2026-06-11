@@ -1,0 +1,34 @@
+# Address PR Review Findings
+
+Reviewers left findings on pull request **#{props.prNumber}**. Resolve them on
+the PR branch.
+
+Findings to address (JSON):
+{props.findings}
+
+For each finding:
+
+- If it is valid, fix it properly in the code (not a superficial patch), and add
+  or update a meaningful test when the finding concerns behavior.
+- If you deliberately do NOT act on a finding (you disagree, it's out of scope,
+  or it's a false positive), do not change code for it — instead record it in
+  `skipped` with a clear, honest `reason`. The reason will be posted back to the
+  reviewers, so make it defensible.
+
+After fixing:
+
+1. Run the project's tests/lint and make sure they pass.
+2. Commit the fixes with a clear message referencing what was addressed.
+3. Push to the PR branch (`git push`).
+4. Capture the new head SHA (`git rev-parse HEAD`).
+
+ABSOLUTE RULE: Do NOT merge the PR. Never run `gh pr merge`, never enable
+auto-merge.
+
+Report each addressed finding (with its commit) and each skipped finding (with
+the reason), plus the new head SHA.
+
+REQUIRED OUTPUT:
+{props.schema}
+
+Return ONLY raw JSON matching the required output schema.

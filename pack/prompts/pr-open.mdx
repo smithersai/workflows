@@ -1,0 +1,30 @@
+# Open Pull Request
+
+Open a GitHub pull request for the work on branch **{props.branch}** against
+base **{props.base}**, then trigger AI review.
+
+Steps (use `git` and `gh` directly):
+
+1. Ensure you are on branch `{props.branch}` and that all intended work is
+   committed. Push it to the remote with upstream tracking
+   (`git push -u origin {props.branch}`).
+2. Create the PR with `gh pr create --base {props.base} --head {props.branch}`
+   using this title and body:
+   - **Title**: {props.title}
+   - **Body**:
+{props.body}
+
+     Append a trailer line: `🤖 Generated with Claude Code (Smithers pr-review-loop)`.
+3. Immediately post a review-trigger comment on the new PR:
+   `gh pr comment <pr-number> --body "{props.reviewersMention} review"`.
+
+Then capture the PR number, URL, and current head SHA
+(`git rev-parse HEAD`).
+
+ABSOLUTE RULE: Do NOT merge the PR. Never run `gh pr merge`, never enable
+auto-merge. Creating and commenting only.
+
+REQUIRED OUTPUT:
+{props.schema}
+
+Return ONLY raw JSON matching the required output schema.

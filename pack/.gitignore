@@ -1,0 +1,16 @@
+node_modules/
+executions/
+runs/
+sandboxes/
+remote/
+state/
+tmp/
+*.db
+*.sqlite
+*.db-shm
+*.db-wal
+dist/
+.DS_Store
+*.log
+logs/
+accounts.json
