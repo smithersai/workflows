@@ -1,0 +1,24 @@
+# Locate the Stack Entry
+
+A change needs to be applied to a stacked-PR feature. Decide which **single entry** it
+belongs to.
+
+CHANGE REQUESTED:
+{props.message}
+
+USER HINT (may be empty — an issue key or branch the user named):
+{props.target}
+
+STACK ENTRIES (bottom to top — index 0 is the base):
+{props.entries}
+
+Choose the entry where this change most naturally belongs: the **lowest** entry whose scope
+covers the change, so the fix lives at its root and jj re-flows it up to every descendant.
+Prefer the entry that introduced the relevant code or behavior. You may read the repository
+to decide. If the user hint names a valid entry, use it unless it is clearly wrong (explain
+why in `reason`).
+
+Do NOT make any code changes. This is a decision-only step.
+
+REQUIRED OUTPUT:
+{props.schema}

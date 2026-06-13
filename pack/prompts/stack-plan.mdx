@@ -1,0 +1,27 @@
+# Plan a Stack
+
+Plan a **stacked-PR sequence** from the Linear source **{props.source}**.
+
+`{props.source}` is either a Linear **project** (id or name) or a **parent issue** key
+(e.g. `ENG-400`). Using the Linear MCP tools available to you (`linear` / `get_project` /
+`get_issue` / `list_issues` / `list_comments`), do the following:
+
+1. **Resolve the source.** If it is a project, list its issues. If it is a parent issue,
+   list its sub-issues. Record the project id and/or parent issue key when present.
+2. **Order the issues into a stack**, bottom to top. The order is the sequence in which the
+   issues should be built so each one stacks cleanly on the previous: foundational work
+   first (schemas, types, contracts, data layer), then the pieces that depend on it
+   (handlers, hooks, UI, wiring), then tests/polish. Respect explicit dependencies and any
+   ordering implied by the issue descriptions or Linear sub-issue order. Every issue in the
+   source must appear exactly once.
+3. Capture each issue's key (e.g. `ENG-401`) and title. Do **not** invent branch names — the
+   workflow derives those deterministically.
+
+Do NOT write any code, create branches, or make repository changes. This is a read-only
+planning step.
+
+REQUIRED OUTPUT:
+{props.schema}
+
+Return ONLY raw JSON matching the required output schema, with `issues` in stack order
+(index 0 is the bottom of the stack).

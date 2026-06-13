@@ -1,0 +1,39 @@
+# Apply Change and Restack (jj)
+
+You are in a **jj (Jujutsu) colocated** repository. Apply a change to one entry of a stack
+and let jj re-flow it through every descendant. This is the whole point of jj: editing a
+change automatically rebases its descendants — you do not run manual `git rebase`.
+
+TARGET BRANCH (jj bookmark): {props.targetBranch}
+
+DESCENDANT BRANCHES that sit above the target and must end up clean (bottom to top):
+{props.descendants}
+
+CHANGE TO MAKE:
+{props.message}
+
+Do exactly this:
+
+1. **Position on the target change:** `jj edit {props.targetBranch}`. The working copy now
+   *is* that change — editing files amends it directly. Do **NOT** run `git commit`,
+   `git rebase`, or `git checkout -b`; use jj for all mutations.
+2. **Make the change** described above by editing files in the working copy.
+3. jj automatically rebases every descendant onto the amended target. Run `jj log` to see
+   the stack and which descendant bookmarks are now conflicted.
+4. **Resolve conflicts bottom to top.** For each conflicted descendant: `jj edit <change>`,
+   fix the conflict markers in the working copy, then check `jj status`. jj re-rebases the
+   higher descendants automatically as each conflict is resolved.
+5. Confirm **every** descendant bookmark in the list points to a conflict-free change. jj
+   exports bookmarks to git automatically, so `git checkout <branch>` will then show the
+   re-flowed result.
+6. For the target branch and each descendant branch, capture:
+   - the new head SHA: `git rev-parse <branch>`
+   - the new jj change id: `jj log -r <branch> --no-graph -T 'change_id ++ "\n"'`
+
+Do NOT push, do NOT open or merge pull requests. This is a local restack only.
+
+REQUIRED OUTPUT:
+{props.schema}
+
+Set `conflictsRemaining: true` only if a conflict could not be fully resolved; otherwise
+list every re-flowed branch under `rebased` with its new head SHA and change id.

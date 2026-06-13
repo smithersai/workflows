@@ -10,6 +10,16 @@ export function packagedPackRoot(): AbsolutePath {
   return join(repoRoot(), "pack");
 }
 
+/** Root directory under SMITHERS_HOME where per-repo stack maps live. */
+export function stacksRoot(smithersHome: AbsolutePath): AbsolutePath {
+  return join(smithersHome, "stacks");
+}
+
+/** Path to a single feature's stack map: `<SMITHERS_HOME>/stacks/<repoSlug>/<feature>.json`. */
+export function stackMapPath(smithersHome: AbsolutePath, repoSlug: string, feature: string): AbsolutePath {
+  return join(stacksRoot(smithersHome), repoSlug, `${feature}.json`);
+}
+
 export function defaultSmithersHome(env: NodeJS.ProcessEnv = process.env): AbsolutePath {
   const configured = env.SMITHERS_HOME;
   if (configured !== undefined && configured.trim() !== "") {

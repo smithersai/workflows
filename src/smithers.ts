@@ -1,11 +1,15 @@
-import { join } from "node:path";
+import { existsSync } from "node:fs";
+import { isAbsolute, join } from "node:path";
 import type {
   AbsolutePath,
   BaseBranchName,
   BranchName,
+  DevWorkflowOptions,
+  FeatureName,
   IssueId,
   PassthroughOptions,
   PullRequestNumber,
+  RepoSlug,
   WorkflowRunOptions,
 } from "./types";
 import { isInitialized } from "./manifest";
@@ -28,8 +32,33 @@ export interface ShipCommand {
   readonly tdd: boolean;
 }
 
-function smithersBin(smithersHome: AbsolutePath): AbsolutePath {
-  return join(smithersHome, "node_modules", ".bin", "smithers");
+export function smithersBin(root: AbsolutePath): AbsolutePath {
+  return join(root, "node_modules", ".bin", "smithers");
+}
+
+function isInputRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Parse a raw `--input` JSON string into a workflow input object. Throws on non-object JSON. */
+export function parseInput(raw: string): Record<string, unknown> {
+  const parsed: unknown = JSON.parse(raw);
+  if (!isInputRecord(parsed)) {
+    throw new Error(`--input must be a JSON object, e.g. '{"issueId":"ENG-123"}'.`);
+  }
+  return parsed;
+}
+
+/** Resolve a workflow name or path to a path smithers can load, relative to the pack root. */
+export function resolveWorkflowPath(workflow: string): string {
+  if (isAbsolute(workflow) || workflow.endsWith(".tsx")) return workflow;
+  return join("workflows", `${workflow}.tsx`);
+}
+
+function ensurePackInstalled(packRoot: AbsolutePath): void {
+  if (!existsSync(smithersBin(packRoot))) {
+    throw new Error(`Pack dependencies are not installed. Run \`bun install\` in ${packRoot} first.`);
+  }
 }
 
 export function implementInput(command: ImplementCommand): Record<string, unknown> {
@@ -47,24 +76,113 @@ export function shipInput(command: ShipCommand): Record<string, unknown> {
   return { issueId: command.issueId, base: command.base, tdd: command.tdd };
 }
 
+export interface StackPlanCommand {
+  /** A Linear project ID or parent issue key whose sub-issues become the stack. */
+  readonly source: string;
+  readonly feature: FeatureName;
+  readonly base: BaseBranchName;
+  readonly repoSlug: RepoSlug;
+  readonly stackMapPath: AbsolutePath;
+}
+
+export function stackPlanInput(command: StackPlanCommand): Record<string, unknown> {
+  return {
+    source: command.source,
+    feature: command.feature,
+    base: command.base,
+    repoSlug: command.repoSlug,
+    stackMapPath: command.stackMapPath,
+  };
+}
+
+export interface StackBuildCommand {
+  readonly stackMapPath: AbsolutePath;
+}
+
+export function stackBuildInput(command: StackBuildCommand): Record<string, unknown> {
+  return { stackMapPath: command.stackMapPath };
+}
+
+export interface StackAmendCommand {
+  readonly stackMapPath: AbsolutePath;
+  /** The change to make to the located entry. */
+  readonly message: string;
+  /** An explicit entry to amend (issue key or branch). Omit to let the workflow locate it. */
+  readonly target?: string;
+}
+
+export function stackAmendInput(command: StackAmendCommand): Record<string, unknown> {
+  const input: Record<string, unknown> = { stackMapPath: command.stackMapPath, message: command.message };
+  if (command.target !== undefined) input.target = command.target;
+  return input;
+}
+
+export interface StackPushCommand {
+  readonly stackMapPath: AbsolutePath;
+  /** How many unpublished entries to publish this batch. */
+  readonly count: number;
+}
+
+export function stackPushInput(command: StackPushCommand): Record<string, unknown> {
+  return { stackMapPath: command.stackMapPath, count: command.count };
+}
+
 export async function runWorkflow(options: WorkflowRunOptions): Promise<void> {
   if (!await isInitialized(options.smithersHome)) {
     throw new Error(`Smithers pack is not initialized at ${options.smithersHome}. Run xiv init first.`);
   }
 
+  const cmd = [
+    smithersBin(options.smithersHome),
+    "up",
+    join(options.smithersHome, "workflows", `${options.workflow}.tsx`),
+    "--input",
+    JSON.stringify(options.input),
+  ];
+  if (options.detach === true) cmd.push("-d");
+
   await runInherited({
-    cmd: [
-      smithersBin(options.smithersHome),
-      "up",
-      join(options.smithersHome, "workflows", `${options.workflow}.tsx`),
-      "--input",
-      JSON.stringify(options.input),
-    ],
+    cmd,
     cwd: options.smithersHome,
     env: {
       ...process.env,
       SMITHERS_TARGET_CWD: options.targetCwd,
     },
+  });
+}
+
+/**
+ * Run a workflow straight from the repo's `pack/` (no install into SMITHERS_HOME).
+ * This is the fast authoring loop: edit `pack/workflows/<name>.tsx`, re-run, repeat.
+ */
+export async function runDevWorkflow(options: DevWorkflowOptions): Promise<void> {
+  ensurePackInstalled(options.packRoot);
+  await runInherited({
+    cmd: [
+      smithersBin(options.packRoot),
+      "up",
+      resolveWorkflowPath(options.workflow),
+      "--input",
+      JSON.stringify(options.input),
+    ],
+    cwd: options.packRoot,
+    env: { ...process.env, SMITHERS_TARGET_CWD: options.targetCwd },
+  });
+}
+
+/** Render a workflow's graph from the in-repo `pack/` without executing it. */
+export async function checkDevWorkflow(options: DevWorkflowOptions): Promise<void> {
+  ensurePackInstalled(options.packRoot);
+  await runInherited({
+    cmd: [
+      smithersBin(options.packRoot),
+      "graph",
+      resolveWorkflowPath(options.workflow),
+      "--input",
+      JSON.stringify(options.input),
+    ],
+    cwd: options.packRoot,
+    env: { ...process.env, SMITHERS_TARGET_CWD: options.targetCwd },
   });
 }
 
