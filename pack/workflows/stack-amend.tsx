@@ -10,11 +10,13 @@ import { z } from "zod/v4";
 import { validateOutputSchema } from "../components/ValidationLoop";
 import {
   descendantsOf,
+  entriesForRepo,
   entriesInOrder,
   findEntryByBranch,
   findEntryByIssue,
   loadStackMapSync,
   saveStackMap,
+  tipFor,
   updateEntry,
 } from "../lib/stack-map";
 import StackEditPrompt from "../prompts/stack-edit.mdx";
@@ -26,6 +28,7 @@ const inputSchema = z.object({
   stackMapPath: z.string().default(""),
   message: z.string().default(""),
   target: z.string().default(""),
+  repo: z.string().default(""),
 });
 
 const locateSchema = z.object({
@@ -82,14 +85,16 @@ export default smithers((ctx) => {
     );
   }
 
-  const entries = entriesInOrder(map);
+  const repo = ctx.input.repo;
+  const entries = repo === "" ? entriesInOrder(map) : entriesForRepo(map, repo);
   const explicit = hint ? findEntryByIssue(map, hint) ?? findEntryByBranch(map, hint) : undefined;
   const located = ctx.outputMaybe(outputs.locate, { nodeId: "amend:locate" });
   const targetEntry = explicit ?? (located ? findEntryByIssue(map, located.issueId) : undefined);
   const needAgentLocate = explicit === undefined;
 
   const descendants = targetEntry ? descendantsOf(map, targetEntry) : [];
-  const tip = map.tipBranch || descendants.at(-1)?.branchName || targetEntry?.branchName || "";
+  const tipRepo = targetEntry?.repo ?? repo;
+  const tip = tipFor(map, tipRepo) || descendants.at(-1)?.branchName || targetEntry?.branchName || "";
   const amended = ctx.outputMaybe(outputs.amend, { nodeId: "amend:edit" });
 
   const entriesForPrompt = entries.map((entry) => ({

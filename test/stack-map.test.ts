@@ -12,12 +12,14 @@ import {
   findEntryByPosition,
   loadStackMap,
   nextUnbuiltEntry,
+  parsePlanFile,
   parseStackMap,
+  planToEntries,
   previousEntry,
   repoSlugFor,
   resolveStackMapPath,
   saveStackMap,
-  setTipBranch,
+  setTip,
   slugifyFeature,
   updateEntry,
 } from "../src/stack-map";
@@ -33,6 +35,7 @@ function entry(position: number, status: StackStatus, extra: Partial<StackEntry>
     position,
     issueId: `ENG-${100 + position}`,
     issueTitle: `Issue ${position}`,
+    repo: "app",
     branchName: `feat/eng-${100 + position}`,
     changeId: `chg${position}`,
     baseBranch: position === 0 ? "main" : `feat/eng-${100 + position - 1}`,
@@ -46,7 +49,7 @@ function mapWith(statuses: readonly StackStatus[]): StackMap {
   return createStackMap({
     feature: "checkout",
     repoSlug: "app-abc12345",
-    baseBranch: "main",
+    repos: { app: { path: "/code/app", baseBranch: "main" } },
     source: { issueIds: statuses.map((_, i) => `ENG-${100 + i}`) },
     entries: statuses.map((status, i) => entry(i, status)),
   });
@@ -58,12 +61,13 @@ describe("parseStackMap", () => {
       version: 1,
       feature: "checkout",
       repoSlug: "app-abc12345",
+      repos: { app: { path: "/code/app", baseBranch: "main" } },
       source: { issueIds: ["ENG-100"] },
-      entries: [{ position: 0, issueId: "ENG-100", branchName: "feat/eng-100", baseBranch: "main" }],
+      entries: [{ position: 0, issueId: "ENG-100", repo: "app", branchName: "feat/eng-100", baseBranch: "main" }],
       createdAt: "2026-06-13T00:00:00.000Z",
       updatedAt: "2026-06-13T00:00:00.000Z",
     });
-    expect(map.baseBranch).toBe("main");
+    expect(map.repos.app?.baseBranch).toBe("main");
     expect(map.engine).toBe("jj");
     expect(map.entries[0]?.status).toBe("pending");
     expect(map.entries[0]?.changeId).toBe("");
@@ -76,7 +80,7 @@ describe("parseStackMap", () => {
         feature: "x",
         repoSlug: "x",
         source: { issueIds: [] },
-        entries: [{ position: 0, issueId: "ENG-1", branchName: "b", baseBranch: "main", status: "wat" }],
+        entries: [{ position: 0, issueId: "ENG-1", repo: "app", branchName: "b", baseBranch: "main", status: "wat" }],
         createdAt: "t",
         updatedAt: "t",
       }),
@@ -169,16 +173,16 @@ describe("queries", () => {
 describe("entriesToPush", () => {
   test("returns the contiguous built run above already-published entries", () => {
     const map = mapWith(["merged", "pushed", "implemented", "implemented", "pending"]);
-    expect(entriesToPush(map, 10).map((e) => e.position)).toEqual([2, 3]);
+    expect(entriesToPush(map, "app", 10).map((e) => e.position)).toEqual([2, 3]);
   });
 
   test("respects the count cap", () => {
     const map = mapWith(["implemented", "implemented", "implemented"]);
-    expect(entriesToPush(map, 2).map((e) => e.position)).toEqual([0, 1]);
+    expect(entriesToPush(map, "app", 2).map((e) => e.position)).toEqual([0, 1]);
   });
 
   test("refuses to push past an unbuilt base", () => {
-    expect(entriesToPush(mapWith(["pending", "implemented"]), 5)).toEqual([]);
+    expect(entriesToPush(mapWith(["pending", "implemented"]), "app", 5)).toEqual([]);
   });
 });
 
@@ -195,7 +199,49 @@ describe("updates", () => {
     expect(() => updateEntry(mapWith(["pending"]), "ENG-999", { status: "merged" })).toThrow("ENG-999");
   });
 
-  test("setTipBranch records the preview branch", () => {
-    expect(setTipBranch(mapWith(["pending"]), "feat/eng-105").tipBranch).toBe("feat/eng-105");
+  test("setTip records the per-repo preview branch", () => {
+    expect(setTip(mapWith(["pending"]), "app", "feat/eng-105").tips.app).toBe("feat/eng-105");
+  });
+});
+
+describe("planToEntries", () => {
+  const repos = {
+    api: { path: "/code/api", baseBranch: "main" },
+    web: { path: "/code/web", baseBranch: "develop" },
+  };
+
+  test("assigns positions and computes WITHIN-repo bases across an interleaved order", () => {
+    const entries = planToEntries(
+      [
+        { issueId: "ENG-1", repo: "api" },
+        { issueId: "ENG-2", repo: "web" },
+        { issueId: "ENG-3", repo: "api" },
+      ],
+      repos,
+    );
+    expect(entries.map((e) => e.position)).toEqual([0, 1, 2]);
+    expect(entries[0]).toMatchObject({ repo: "api", branchName: "feat/eng-1", baseBranch: "main" });
+    expect(entries[1]).toMatchObject({ repo: "web", branchName: "feat/eng-2", baseBranch: "develop" });
+    // ENG-3 stacks on ENG-1 (previous *api* entry), not ENG-2 (a web entry between them).
+    expect(entries[2]).toMatchObject({ repo: "api", branchName: "feat/eng-3", baseBranch: "feat/eng-1" });
+  });
+
+  test("falls back to the first repo for an unknown key", () => {
+    expect(planToEntries([{ issueId: "ENG-9", repo: "ghost" }], repos)[0]?.repo).toBe("api");
+  });
+});
+
+describe("parsePlanFile", () => {
+  test("parses order and excluded", () => {
+    const plan = parsePlanFile({
+      order: [{ issueId: "ENG-1", repo: "api", title: "schema" }],
+      excluded: [{ issueId: "ENG-9", reason: "infra/manual" }],
+    });
+    expect(plan.order).toHaveLength(1);
+    expect(plan.excluded?.[0]?.issueId).toBe("ENG-9");
+  });
+
+  test("rejects an order entry missing a repo", () => {
+    expect(() => parsePlanFile({ order: [{ issueId: "ENG-1" }] })).toThrow();
   });
 });

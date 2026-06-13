@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { createStackMap, setTipBranch } from "../src/stack-map";
-import { stackInitAction, stackStatusReport } from "../src/stack";
+import { createStackMap, setTip } from "../src/stack-map";
+import { parseRepoArgs, stackInitAction, stackStatusReport } from "../src/stack";
 import type { JjPreflight, StackEntry, StackMap } from "../src/types";
 
 function entry(position: number, patch: Partial<StackEntry> = {}): StackEntry {
@@ -8,6 +8,7 @@ function entry(position: number, patch: Partial<StackEntry> = {}): StackEntry {
     position,
     issueId: `ENG-${100 + position}`,
     issueTitle: `Issue ${position}`,
+    repo: "app",
     branchName: `feat/eng-${100 + position}`,
     changeId: `chg${position}`,
     baseBranch: position === 0 ? "main" : `feat/eng-${100 + position - 1}`,
@@ -21,20 +22,18 @@ function sampleMap(): StackMap {
   return createStackMap({
     feature: "checkout",
     repoSlug: "app-abc12345",
-    baseBranch: "main",
+    repos: { app: { path: "/code/app", baseBranch: "main" } },
     source: { issueIds: ["ENG-100", "ENG-101"] },
-    entries: [
-      entry(0, { status: "pr-open", prNumber: 1234 }),
-      entry(1, { status: "implemented" }),
-    ],
+    entries: [entry(0, { status: "pr-open", prNumber: 1234 }), entry(1, { status: "implemented" })],
   });
 }
 
 describe("stackStatusReport", () => {
-  test("includes the feature header, every entry, and PR numbers", () => {
+  test("includes the feature header, the repo group, every entry, and PR numbers", () => {
     const report = stackStatusReport(sampleMap());
     expect(report).toContain("Stack: checkout");
     expect(report).toContain("engine jj");
+    expect(report).toContain("repo app");
     expect(report).toContain("ENG-100");
     expect(report).toContain("ENG-101");
     expect(report).toContain("#1234");
@@ -43,8 +42,8 @@ describe("stackStatusReport", () => {
 
   test("flags an unbuilt tip and a built tip", () => {
     expect(stackStatusReport(sampleMap())).toContain("not built yet");
-    const built = setTipBranch(sampleMap(), "feat/eng-101");
-    expect(stackStatusReport(built)).toContain("git checkout feat/eng-101");
+    const built = setTip(sampleMap(), "app", "feat/eng-101");
+    expect(stackStatusReport(built)).toContain("feat/eng-101");
   });
 });
 
@@ -66,5 +65,23 @@ describe("stackInitAction", () => {
 
   test("colocate when jj is present but the repo is plain git", () => {
     expect(stackInitAction(preflight({ isRepo: false }))).toBe("colocate");
+  });
+});
+
+describe("parseRepoArgs", () => {
+  test("defaults to a single repo rooted at cwd when no flags are given", () => {
+    expect(parseRepoArgs([], "main", "/Users/me/code/app")).toEqual({
+      app: { path: "/Users/me/code/app", baseBranch: "main" },
+    });
+  });
+
+  test("parses key=path flags, all sharing the given base", () => {
+    const repos = parseRepoArgs(["api=/code/api", "web=/code/web"], "develop", "/cwd");
+    expect(repos.api).toEqual({ path: "/code/api", baseBranch: "develop" });
+    expect(repos.web).toEqual({ path: "/code/web", baseBranch: "develop" });
+  });
+
+  test("rejects a flag without key=path", () => {
+    expect(() => parseRepoArgs(["nopath"], "main", "/cwd")).toThrow();
   });
 });

@@ -19,7 +19,12 @@ describe("howToGuide", () => {
   });
 
   test("states the hard rules and where commands must run", () => {
-    expect(guide).toContain("inside the target");
+    expect(guide).toContain("target git repo");
     expect(guide).toContain("Never merge");
+  });
+
+  test("documents multi-repo orchestration", () => {
+    expect(guide).toContain("MULTI-REPO");
+    expect(guide).toContain("--all-repos");
   });
 });

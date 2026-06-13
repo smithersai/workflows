@@ -1,7 +1,7 @@
 // smithers-source: authored
 // smithers-metadata-version: 1
 // smithers-display-name: Stack Plan
-// smithers-description: Fetch a Linear project or parent issue, order its issues into a stack, and write the stack map. No code changes.
+// smithers-description: Fetch a Linear project or parent issue, assign each issue to a repo, order each repo's issues into a substack, and write the stack map. No code changes.
 // smithers-tags: linear, stack, planning
 // smithers-aliases: sp
 /** @jsxImportSource smithers-orchestrator */
@@ -11,11 +11,17 @@ import { providers } from "../agents";
 import { createStackMap, saveStackMap, type StackEntry } from "../lib/stack-map";
 import StackPlanPrompt from "../prompts/stack-plan.mdx";
 
+const repoConfigSchema = z.object({
+  path: z.string(),
+  baseBranch: z.string().default("main"),
+  remote: z.string().optional(),
+});
+
 const inputSchema = z.object({
   source: z.string().default(""),
   feature: z.string().default(""),
-  base: z.string().default("main"),
   repoSlug: z.string().default(""),
+  repos: z.record(z.string(), repoConfigSchema).default({}),
   stackMapPath: z.string().default(""),
 });
 
@@ -23,7 +29,7 @@ const plannedStackSchema = z.object({
   linearProjectId: z.string().default(""),
   parentIssueId: z.string().default(""),
   issues: z
-    .array(z.object({ issueId: z.string(), issueTitle: z.string().default("") }))
+    .array(z.object({ issueId: z.string(), issueTitle: z.string().default(""), repo: z.string().default("") }))
     .default([]),
 });
 
@@ -31,7 +37,7 @@ const persistSchema = z.object({
   stackMapPath: z.string(),
   feature: z.string(),
   entryCount: z.number().int(),
-  tipBranch: z.string().default(""),
+  repoCount: z.number().int().default(0),
 });
 
 const { Workflow, Task, Sequence, smithers } = createSmithers({
@@ -46,7 +52,7 @@ function branchFor(issueId: string): string {
 }
 
 export default smithers((ctx) => {
-  const base = ctx.input.base || "main";
+  const repoKeyList = Object.keys(ctx.input.repos);
   const planned = ctx.outputMaybe("planned", { nodeId: "plan" });
 
   return (
@@ -59,26 +65,39 @@ export default smithers((ctx) => {
           timeoutMs={900_000}
           heartbeatTimeoutMs={300_000}
         >
-          <StackPlanPrompt source={ctx.input.source} feature={ctx.input.feature} />
+          <StackPlanPrompt
+            source={ctx.input.source}
+            feature={ctx.input.feature}
+            repos={JSON.stringify(repoKeyList)}
+          />
         </Task>
 
         <Task id="persist" output={persistSchema} skipIf={planned === undefined}>
           {async () => {
             const issues = planned?.issues ?? [];
-            const entries: StackEntry[] = issues.map((issue, index) => ({
-              position: index,
-              issueId: issue.issueId,
-              issueTitle: issue.issueTitle,
-              branchName: branchFor(issue.issueId),
-              changeId: "",
-              baseBranch: index === 0 ? base : branchFor(issues[index - 1].issueId),
-              headSha: "",
-              status: "pending",
-            }));
+            const fallbackRepo = repoKeyList[0] ?? "default";
+            const lastBranchByRepo: Record<string, string> = {};
+            const entries: StackEntry[] = issues.map((issue, index) => {
+              const repo = ctx.input.repos[issue.repo] !== undefined ? issue.repo : fallbackRepo;
+              const branch = branchFor(issue.issueId);
+              const base = lastBranchByRepo[repo] ?? ctx.input.repos[repo]?.baseBranch ?? "main";
+              lastBranchByRepo[repo] = branch;
+              return {
+                position: index,
+                issueId: issue.issueId,
+                issueTitle: issue.issueTitle,
+                repo,
+                branchName: branch,
+                changeId: "",
+                baseBranch: base,
+                headSha: "",
+                status: "pending",
+              };
+            });
             const map = createStackMap({
               feature: ctx.input.feature,
               repoSlug: ctx.input.repoSlug,
-              baseBranch: base,
+              repos: ctx.input.repos,
               source: {
                 linearProjectId: planned?.linearProjectId || undefined,
                 parentIssueId: planned?.parentIssueId || undefined,
@@ -91,7 +110,7 @@ export default smithers((ctx) => {
               stackMapPath: ctx.input.stackMapPath,
               feature: ctx.input.feature,
               entryCount: entries.length,
-              tipBranch: map.tipBranch,
+              repoCount: repoKeyList.length,
             };
           }}
         </Task>

@@ -11,10 +11,12 @@ import { SubflowLoose } from "../components/SubflowLoose.js";
 import { finalizeSchema } from "../components/LinearIssue";
 import { gitCheckout } from "../lib/git";
 import {
+  entriesForRepo,
   entriesInOrder,
   loadStackMapSync,
   saveStackMap,
-  setTipBranch,
+  setTip,
+  tipFor,
   updateEntry,
   type StackEntry,
 } from "../lib/stack-map";
@@ -22,6 +24,7 @@ import linearImplement from "./linear-implement";
 
 const inputSchema = z.object({
   stackMapPath: z.string().default(""),
+  repo: z.string().default(""),
 });
 
 const ackSchema = z.object({
@@ -31,9 +34,10 @@ const ackSchema = z.object({
 
 const summarySchema = z.object({
   feature: z.string().default(""),
+  repo: z.string().default(""),
   built: z.number().int().default(0),
   pending: z.number().int().default(0),
-  tipBranch: z.string().default(""),
+  tip: z.string().default(""),
 });
 
 const { Workflow, Task, Sequence, smithers, outputs } = createSmithers({
@@ -65,7 +69,8 @@ export default smithers((ctx) => {
     );
   }
 
-  const entries = entriesInOrder(map);
+  const repo = ctx.input.repo;
+  const entries = repo === "" ? entriesInOrder(map) : entriesForRepo(map, repo);
 
   return (
     <Workflow name="stack-build">
@@ -105,7 +110,7 @@ export default smithers((ctx) => {
                     headSha: built?.headSha ?? "",
                     branchName: branch,
                   });
-                  await saveStackMap(stackMapPath, setTipBranch(recorded, branch));
+                  await saveStackMap(stackMapPath, setTip(recorded, entry.repo, branch));
                   return { ok: true, detail: `recorded ${entry.issueId} -> ${branch}` };
                 }}
               </Task>
@@ -116,12 +121,14 @@ export default smithers((ctx) => {
         <Task id="build:summary" output={outputs.summary}>
           {() => {
             const current = loadStackMapSync(stackMapPath) ?? map;
-            const built = current.entries.filter(isBuilt).length;
+            const scoped = repo === "" ? current.entries : current.entries.filter((entry) => entry.repo === repo);
+            const built = scoped.filter(isBuilt).length;
             return {
               feature: current.feature,
+              repo,
               built,
-              pending: current.entries.length - built,
-              tipBranch: current.tipBranch,
+              pending: scoped.length - built,
+              tip: tipFor(current, repo),
             };
           }}
         </Task>

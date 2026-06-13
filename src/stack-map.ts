@@ -8,6 +8,10 @@ import type {
   BranchName,
   FeatureName,
   IssueId,
+  PlanFile,
+  PlannedIssue,
+  RepoConfig,
+  RepoKey,
   RepoSlug,
   StackEntry,
   StackMap,
@@ -30,6 +34,7 @@ const stackEntrySchema = z.object({
   position: z.number().int().nonnegative(),
   issueId: z.string(),
   issueTitle: z.string().default(""),
+  repo: z.string(),
   branchName: z.string(),
   changeId: z.string().default(""),
   baseBranch: z.string(),
@@ -38,20 +43,41 @@ const stackEntrySchema = z.object({
   prNumber: z.number().int().optional(),
   prUrl: z.string().optional(),
   pushedSha: z.string().optional(),
+  dependsOn: z.array(z.string()).optional(),
+});
+
+const repoConfigSchema = z.object({
+  path: z.string(),
+  baseBranch: z.string().default("main"),
+  remote: z.string().optional(),
+});
+
+const excludedIssueSchema = z.object({
+  issueId: z.string(),
+  reason: z.string().default(""),
 });
 
 const stackFeatureSourceSchema = z.object({
   linearProjectId: z.string().optional(),
   parentIssueId: z.string().optional(),
   issueIds: z.array(z.string()).default([]),
+  excluded: z.array(excludedIssueSchema).optional(),
+});
+
+const planFileSchema = z.object({
+  order: z
+    .array(z.object({ issueId: z.string(), title: z.string().optional(), repo: z.string() }))
+    .default([]),
+  excluded: z.array(excludedIssueSchema).optional(),
+  source: z.object({ linearProjectId: z.string().optional(), parentIssueId: z.string().optional() }).optional(),
 });
 
 const stackMapSchema = z.object({
   version: z.literal(1),
   feature: z.string(),
   repoSlug: z.string(),
-  baseBranch: z.string().default("main"),
-  tipBranch: z.string().default(""),
+  repos: z.record(z.string(), repoConfigSchema).default({}),
+  tips: z.record(z.string(), z.string()).default({}),
   engine: stackEngineSchema.default("jj"),
   source: stackFeatureSourceSchema,
   entries: z.array(stackEntrySchema).default([]),
@@ -66,6 +92,45 @@ const stackMapSchema = z.object({
  */
 export function parseStackMap(raw: unknown): StackMap {
   return stackMapSchema.parse(raw);
+}
+
+/** Validate a resolved plan file (produced by the stack-plan skill). Throws on malformed data. */
+export function parsePlanFile(raw: unknown): PlanFile {
+  return planFileSchema.parse(raw);
+}
+
+/** Deterministic branch (jj bookmark) name for an issue — mirrors linear-implement's convention. */
+export function branchFor(issueId: IssueId): BranchName {
+  return `feat/${issueId.toLowerCase()}`;
+}
+
+/**
+ * Turn an ordered, repo-assigned issue list into stack entries, computing each entry's base as the
+ * previous SAME-REPO entry's branch (or that repo's trunk). Unknown repo keys fall back to the first.
+ */
+export function planToEntries(
+  order: readonly PlannedIssue[],
+  repos: Record<RepoKey, RepoConfig>,
+): StackEntry[] {
+  const fallback = Object.keys(repos)[0] ?? "default";
+  const lastBranchByRepo: Record<RepoKey, BranchName> = {};
+  return order.map((issue, index) => {
+    const repo = repos[issue.repo] !== undefined ? issue.repo : fallback;
+    const branch = branchFor(issue.issueId);
+    const base = lastBranchByRepo[repo] ?? repos[repo]?.baseBranch ?? "main";
+    lastBranchByRepo[repo] = branch;
+    return {
+      position: index,
+      issueId: issue.issueId,
+      issueTitle: issue.title ?? "",
+      repo,
+      branchName: branch,
+      changeId: "",
+      baseBranch: base,
+      headSha: "",
+      status: "pending",
+    };
+  });
 }
 
 /**
@@ -123,7 +188,7 @@ export async function saveStackMap(path: AbsolutePath, map: StackMap, now: Date 
 export interface CreateStackMapOptions {
   readonly feature: FeatureName;
   readonly repoSlug: RepoSlug;
-  readonly baseBranch: BranchName;
+  readonly repos: Record<RepoKey, RepoConfig>;
   readonly source: StackMap["source"];
   readonly entries: readonly StackEntry[];
 }
@@ -134,8 +199,8 @@ export function createStackMap(options: CreateStackMapOptions, now: Date = new D
     version: 1,
     feature: options.feature,
     repoSlug: options.repoSlug,
-    baseBranch: options.baseBranch,
-    tipBranch: "",
+    repos: options.repos,
+    tips: {},
     engine: "jj",
     source: options.source,
     entries: sortByPosition(options.entries),
@@ -154,6 +219,21 @@ export function entriesInOrder(map: StackMap): StackEntry[] {
   return sortByPosition(map.entries);
 }
 
+/** The repo keys this feature spans, in a stable order. */
+export function repoKeys(map: StackMap): RepoKey[] {
+  return Object.keys(map.repos).sort();
+}
+
+/** Entries belonging to one repo's substack, in stack (position) order. */
+export function entriesForRepo(map: StackMap, repo: RepoKey): StackEntry[] {
+  return entriesInOrder(map).filter((entry) => entry.repo === repo);
+}
+
+/** Trunk branch for a repo (its substack base). */
+export function repoBaseBranch(map: StackMap, repo: RepoKey): BranchName {
+  return map.repos[repo]?.baseBranch ?? "main";
+}
+
 export function findEntryByIssue(map: StackMap, issueId: IssueId): StackEntry | undefined {
   return map.entries.find((entry) => entry.issueId === issueId);
 }
@@ -166,40 +246,40 @@ export function findEntryByPosition(map: StackMap, position: StackPosition): Sta
   return map.entries.find((entry) => entry.position === position);
 }
 
-/** The entry immediately below `entry` in the stack, or undefined for the bottom entry. */
+/** The entry immediately below `entry` in its repo's substack, or undefined for that repo's bottom. */
 export function previousEntry(map: StackMap, entry: StackEntry): StackEntry | undefined {
-  return entriesInOrder(map)
+  return entriesForRepo(map, entry.repo)
     .filter((candidate) => candidate.position < entry.position)
     .at(-1);
 }
 
-/** The branch `entry` should be stacked on: the previous entry's branch, or the stack base. */
+/** The branch `entry` stacks on: the previous SAME-REPO entry's branch, or the repo's trunk. */
 export function baseBranchFor(map: StackMap, entry: StackEntry): BranchName {
-  return previousEntry(map, entry)?.branchName ?? map.baseBranch;
+  return previousEntry(map, entry)?.branchName ?? repoBaseBranch(map, entry.repo);
 }
 
-/** All entries above `entry` (its descendants), in stack order. */
+/** All entries above `entry` in the same repo (its descendants), in stack order. */
 export function descendantsOf(map: StackMap, entry: StackEntry): StackEntry[] {
-  return entriesInOrder(map).filter((candidate) => candidate.position > entry.position);
+  return entriesForRepo(map, entry.repo).filter((candidate) => candidate.position > entry.position);
 }
 
 const UNBUILT: ReadonlySet<StackStatus> = new Set<StackStatus>(["pending", "implementing"]);
 const PUBLISHED: ReadonlySet<StackStatus> = new Set<StackStatus>(["pushed", "pr-open", "merged"]);
 
-/** The next entry to build: the lowest-position entry not yet implemented. */
-export function nextUnbuiltEntry(map: StackMap): StackEntry | undefined {
-  return entriesInOrder(map).find((entry) => UNBUILT.has(entry.status));
+/** The next entry to build, optionally within one repo: the lowest-position entry not yet implemented. */
+export function nextUnbuiltEntry(map: StackMap, repo?: RepoKey): StackEntry | undefined {
+  const entries = repo === undefined ? entriesInOrder(map) : entriesForRepo(map, repo);
+  return entries.find((entry) => UNBUILT.has(entry.status));
 }
 
 /**
- * The lowest contiguous run of built-but-unpublished entries to publish next, capped at `count`.
- * Publishing must stay contiguous from the bottom: an entry is only eligible once every entry
- * below it is already published, so a PR never opens against an unpushed base.
+ * The lowest contiguous run of built-but-unpublished entries in ONE repo to publish next, capped at
+ * `count`. Stays contiguous from the bottom of that repo's substack so a PR never opens against an
+ * unpushed base.
  */
-export function entriesToPush(map: StackMap, count: number): StackEntry[] {
-  const ordered = entriesInOrder(map);
+export function entriesToPush(map: StackMap, repo: RepoKey, count: number): StackEntry[] {
   const batch: StackEntry[] = [];
-  for (const entry of ordered) {
+  for (const entry of entriesForRepo(map, repo)) {
     if (PUBLISHED.has(entry.status)) continue;
     if (entry.status !== "implemented") break; // hit an unbuilt entry: cannot publish past it
     batch.push(entry);
@@ -208,15 +288,16 @@ export function entriesToPush(map: StackMap, count: number): StackEntry[] {
   return batch;
 }
 
-/** The base branch a new PR for `entry` should target: the previous entry's branch, or the stack base if that entry is merged/absent. */
+/** The base branch a new PR for `entry` should target: the previous same-repo entry's branch, or the repo trunk if that entry is merged/absent. */
 export function prBaseFor(map: StackMap, entry: StackEntry): BranchName {
   const prev = previousEntry(map, entry);
-  return prev !== undefined && prev.status !== "merged" ? prev.branchName : map.baseBranch;
+  return prev !== undefined && prev.status !== "merged" ? prev.branchName : repoBaseBranch(map, entry.repo);
 }
 
-/** Open PRs whose branch was re-flowed since it was last pushed (headSha drifted from pushedSha). */
-export function staleEntries(map: StackMap): StackEntry[] {
-  return entriesInOrder(map).filter(
+/** Open PRs whose branch was re-flowed since it was last pushed (headSha drifted from pushedSha), optionally within one repo. */
+export function staleEntries(map: StackMap, repo?: RepoKey): StackEntry[] {
+  const entries = repo === undefined ? entriesInOrder(map) : entriesForRepo(map, repo);
+  return entries.filter(
     (entry) =>
       (entry.status === "pr-open" || entry.status === "pushed") && entry.headSha !== (entry.pushedSha ?? ""),
   );
@@ -239,6 +320,11 @@ export function updateEntry(
   return { ...map, entries };
 }
 
-export function setTipBranch(map: StackMap, tipBranch: BranchName): StackMap {
-  return { ...map, tipBranch };
+/** The tip branch for a repo's substack (empty until that repo has built at least once). */
+export function tipFor(map: StackMap, repo: RepoKey): BranchName {
+  return map.tips[repo] ?? "";
+}
+
+export function setTip(map: StackMap, repo: RepoKey, branch: BranchName): StackMap {
+  return { ...map, tips: { ...map.tips, [repo]: branch } };
 }

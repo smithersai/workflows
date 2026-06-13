@@ -41,33 +41,41 @@ describe("workflow input builders", () => {
     });
   });
 
-  test("builds stack plan input", () => {
+  test("builds stack plan input with a repo registry", () => {
+    const repos = { app: { path: "/code/app", baseBranch: "main" } };
     expect(
       stackPlanInput({
         source: "PROJ-1",
         feature: "checkout",
-        base: "main",
         repoSlug: "app-abc12345",
+        repos,
         stackMapPath: "/home/.smithers/stacks/app/checkout.json",
       }),
     ).toEqual({
       source: "PROJ-1",
       feature: "checkout",
-      base: "main",
       repoSlug: "app-abc12345",
+      repos,
       stackMapPath: "/home/.smithers/stacks/app/checkout.json",
     });
   });
 
-  test("builds stack build input", () => {
+  test("builds stack build input, with and without a repo scope", () => {
     expect(stackBuildInput({ stackMapPath: "/p/checkout.json" })).toEqual({ stackMapPath: "/p/checkout.json" });
+    expect(stackBuildInput({ stackMapPath: "/p/checkout.json", repo: "api" })).toEqual({
+      stackMapPath: "/p/checkout.json",
+      repo: "api",
+    });
   });
 
-  test("builds stack amend input with and without an explicit target", () => {
-    expect(stackAmendInput({ stackMapPath: "/p/checkout.json", message: "make it blue", target: "ENG-105" })).toEqual({
+  test("builds stack amend input with and without an explicit target/repo", () => {
+    expect(
+      stackAmendInput({ stackMapPath: "/p/checkout.json", message: "make it blue", target: "ENG-105", repo: "api" }),
+    ).toEqual({
       stackMapPath: "/p/checkout.json",
       message: "make it blue",
       target: "ENG-105",
+      repo: "api",
     });
     expect(stackAmendInput({ stackMapPath: "/p/checkout.json", message: "make it blue" })).toEqual({
       stackMapPath: "/p/checkout.json",
@@ -75,10 +83,15 @@ describe("workflow input builders", () => {
     });
   });
 
-  test("builds stack push input", () => {
+  test("builds stack push input, with and without a repo scope", () => {
     expect(stackPushInput({ stackMapPath: "/p/checkout.json", count: 5 })).toEqual({
       stackMapPath: "/p/checkout.json",
       count: 5,
+    });
+    expect(stackPushInput({ stackMapPath: "/p/checkout.json", count: 5, repo: "web" })).toEqual({
+      stackMapPath: "/p/checkout.json",
+      count: 5,
+      repo: "web",
     });
   });
 });

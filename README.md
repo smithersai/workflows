@@ -42,6 +42,29 @@ xiv stack amend  --feature checkout -m "rename the column" [--target ENG-401]
                                                  # edit one entry; jj re-flows it through every descendant
 ```
 
+### Multi-repo features
+
+A feature can span several repos (e.g. microservices). Pass one `--repo key=path` per repo to
+`plan` (omit for single-repo = the current directory); the planner assigns each Linear issue to a
+repo and gives each repo its **own independent substack** (stacking is within a repo only). Then
+`xiv stack build --all-repos` fans out one pinned run per repo in parallel (`xiv stack init` each
+repo first), and `xiv stack preview` checks out **every** repo at its tip so all services are
+feature-complete together for local testing. Cross-repo contract breaks aren't auto-propagated —
+they surface at integration-test time (or to you).
+
+```bash
+xiv stack plan PROJ-42 --feature payments \
+  --repo api=/code/api --repo ledger=/code/ledger-rs --repo notifier=/code/notifier
+xiv stack build --feature payments --all-repos
+xiv stack preview --feature payments        # all three repos at their tips
+```
+
+When the repo for an issue isn't obvious, use the **`stack-plan` skill** (in `skills/stack-plan/`):
+your agent fetches the issues, auto-assigns the obvious ones, asks you about the unclear ones, and
+recommends **excluding** non-code work (e.g. "set GCP secrets") — then writes a resolved plan and
+persists it with `xiv stack plan --feature <slug> --repo … --plan <file>`. Excluded issues are
+recorded in the map and shown by `xiv stack status`, never built.
+
 `plan` orders the issues into a dependency-respecting sequence and writes a **stack map** — the
 source of truth linking each Linear issue to its branch, position, and PR. It lives in
 `SMITHERS_HOME` at `stacks/<repo-slug>/<feature>.json` (per target repo). `build` runs each issue

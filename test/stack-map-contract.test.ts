@@ -9,26 +9,33 @@ const FULL_FIXTURE = {
   version: 1,
   feature: "checkout",
   repoSlug: "app-abc12345",
-  baseBranch: "develop",
-  tipBranch: "feat/eng-102",
+  repos: {
+    api: { path: "/code/api", baseBranch: "develop" },
+    web: { path: "/code/web", baseBranch: "main" },
+  },
+  tips: { api: "feat/eng-101", web: "feat/eng-102" },
   engine: "jj",
-  source: { linearProjectId: "PROJ-1", issueIds: ["ENG-100", "ENG-101", "ENG-102"] },
+  source: {
+    linearProjectId: "PROJ-1",
+    issueIds: ["ENG-100", "ENG-101", "ENG-102"],
+    excluded: [{ issueId: "ENG-410", reason: "infra/manual: set GCP secrets" }],
+  },
   entries: [
-    { position: 0, issueId: "ENG-100", issueTitle: "Bottom", branchName: "feat/eng-100", changeId: "c0", baseBranch: "develop", headSha: "aaa", status: "merged" },
-    { position: 1, issueId: "ENG-101", issueTitle: "Middle", branchName: "feat/eng-101", changeId: "c1", baseBranch: "feat/eng-100", headSha: "bbb", status: "pr-open", prNumber: 1240, prUrl: "https://x/1240" },
-    { position: 2, issueId: "ENG-102", issueTitle: "Top", branchName: "feat/eng-102", changeId: "c2", baseBranch: "feat/eng-101", headSha: "ccc", status: "implemented" },
+    { position: 0, issueId: "ENG-100", issueTitle: "Bottom", repo: "api", branchName: "feat/eng-100", changeId: "c0", baseBranch: "develop", headSha: "aaa", status: "merged" },
+    { position: 1, issueId: "ENG-101", issueTitle: "Middle", repo: "api", branchName: "feat/eng-101", changeId: "c1", baseBranch: "feat/eng-100", headSha: "bbb", status: "pr-open", prNumber: 1240, prUrl: "https://x/1240", pushedSha: "bbb" },
+    { position: 2, issueId: "ENG-102", issueTitle: "Top", repo: "web", branchName: "feat/eng-102", changeId: "c2", baseBranch: "main", headSha: "ccc", status: "implemented", dependsOn: ["ENG-101"] },
   ],
   createdAt: "2026-06-13T00:00:00.000Z",
   updatedAt: "2026-06-13T00:00:00.000Z",
 };
 
-// Minimal fixture: exercises both schemas' defaulting (status, changeId, engine, baseBranch, ...).
+// Minimal fixture: exercises both schemas' defaulting (status, changeId, engine, repos, tips, ...).
 const MINIMAL_FIXTURE = {
   version: 1,
   feature: "x",
   repoSlug: "x-1",
   source: { issueIds: ["ENG-1"] },
-  entries: [{ position: 0, issueId: "ENG-1", branchName: "feat/eng-1", baseBranch: "main" }],
+  entries: [{ position: 0, issueId: "ENG-1", repo: "app", branchName: "feat/eng-1", baseBranch: "main" }],
   createdAt: "t",
   updatedAt: "t",
 };
@@ -49,13 +56,14 @@ describe("stack-map CLI/pack contract", () => {
     const options = {
       feature: "checkout",
       repoSlug: "app-abc12345",
-      baseBranch: "main",
+      repos: { app: { path: "/code/app", baseBranch: "main" } },
       source: { issueIds: ["ENG-100"] },
       entries: [
         {
           position: 0,
           issueId: "ENG-100",
           issueTitle: "Bottom",
+          repo: "app",
           branchName: "feat/eng-100",
           changeId: "",
           baseBranch: "main",

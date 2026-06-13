@@ -9,6 +9,8 @@ import type {
   IssueId,
   PassthroughOptions,
   PullRequestNumber,
+  RepoConfig,
+  RepoKey,
   RepoSlug,
   WorkflowRunOptions,
 } from "./types";
@@ -80,8 +82,9 @@ export interface StackPlanCommand {
   /** A Linear project ID or parent issue key whose sub-issues become the stack. */
   readonly source: string;
   readonly feature: FeatureName;
-  readonly base: BaseBranchName;
   readonly repoSlug: RepoSlug;
+  /** The repo(s) this feature may span, keyed by RepoKey. A single-repo feature has one entry. */
+  readonly repos: Record<RepoKey, RepoConfig>;
   readonly stackMapPath: AbsolutePath;
 }
 
@@ -89,18 +92,22 @@ export function stackPlanInput(command: StackPlanCommand): Record<string, unknow
   return {
     source: command.source,
     feature: command.feature,
-    base: command.base,
     repoSlug: command.repoSlug,
+    repos: command.repos,
     stackMapPath: command.stackMapPath,
   };
 }
 
 export interface StackBuildCommand {
   readonly stackMapPath: AbsolutePath;
+  /** Build only this repo's substack. Omit for a single-repo stack. */
+  readonly repo?: RepoKey;
 }
 
 export function stackBuildInput(command: StackBuildCommand): Record<string, unknown> {
-  return { stackMapPath: command.stackMapPath };
+  const input: Record<string, unknown> = { stackMapPath: command.stackMapPath };
+  if (command.repo !== undefined) input.repo = command.repo;
+  return input;
 }
 
 export interface StackAmendCommand {
@@ -109,11 +116,14 @@ export interface StackAmendCommand {
   readonly message: string;
   /** An explicit entry to amend (issue key or branch). Omit to let the workflow locate it. */
   readonly target?: string;
+  /** The repo whose substack is being amended (scopes locate + sets the working repo). */
+  readonly repo?: RepoKey;
 }
 
 export function stackAmendInput(command: StackAmendCommand): Record<string, unknown> {
   const input: Record<string, unknown> = { stackMapPath: command.stackMapPath, message: command.message };
   if (command.target !== undefined) input.target = command.target;
+  if (command.repo !== undefined) input.repo = command.repo;
   return input;
 }
 
@@ -121,10 +131,14 @@ export interface StackPushCommand {
   readonly stackMapPath: AbsolutePath;
   /** How many unpublished entries to publish this batch. */
   readonly count: number;
+  /** Publish only this repo's substack. Omit for a single-repo stack. */
+  readonly repo?: RepoKey;
 }
 
 export function stackPushInput(command: StackPushCommand): Record<string, unknown> {
-  return { stackMapPath: command.stackMapPath, count: command.count };
+  const input: Record<string, unknown> = { stackMapPath: command.stackMapPath, count: command.count };
+  if (command.repo !== undefined) input.repo = command.repo;
+  return input;
 }
 
 export async function runWorkflow(options: WorkflowRunOptions): Promise<void> {

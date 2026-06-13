@@ -18,16 +18,30 @@ THE LOOP — how to know what to do next
        action=done   -> every entry merged; the feature is complete
   3. Run the matching command, then go back to step 1.
 
-COMMANDS (always run inside the target repo)
+COMMANDS (run orchestration commands from your "home" repo; init/build operate per repo)
   xiv stack init                                       one-time per repo: colocate jj
   xiv stack plan <project|ENG-400> --feature <slug>    build the ordered stack map from Linear
-  xiv stack status  --feature <slug>                   human-readable map (positions, PRs)
+       [--repo key=path]...                            multi-repo: assign issues across repos (repeatable)
+  xiv stack status  --feature <slug>                   human-readable map (grouped by repo)
   xiv stack triage  --feature <slug> [--json]          what-to-do-next oracle (start here)
-  xiv stack build   --feature <slug> [--detach]        build all unbuilt entries locally; resumable
-  xiv stack preview --feature <slug>                   checkout the tip = preview the whole feature
-  xiv stack push    --feature <slug> --count <N>       open lowest N as stacked PRs (+ re-sync re-flowed)
+  xiv stack build   --feature <slug> [--all-repos|--repo <key>] [--detach]   build entries locally; resumable
+  xiv stack preview --feature <slug>                   checkout every repo at its tip = preview the feature
+  xiv stack push    --feature <slug> --count <N> [--all-repos|--repo <key>]  open lowest N as stacked PRs
   xiv stack amend   --feature <slug> -m "<change>" [--target <issue|branch>]
-                                                       change one entry; jj re-flows it up the stack
+                                                       change one entry; jj re-flows it up its repo's stack
+
+MULTI-REPO (microservices)
+  A feature can span repos. \`plan\` assigns each issue a repo (one --repo key=path per repo;
+  omit for single-repo = current dir). Each repo gets its own independent substack — stacking
+  is WITHIN a repo only. \`build --all-repos\` fans out one pinned run per repo, in parallel
+  (run init in each repo first). \`preview\` checks out every repo at its tip so all services
+  are feature-complete together for local testing. Cross-repo contract breaks are NOT
+  auto-propagated — they surface at integration test time / to a human.
+
+  For interactive planning (assign obvious issues, confirm the unclear ones, exclude non-code
+  work like "set GCP secrets"), use the \`stack-plan\` skill — it writes a resolved plan and
+  persists it via \`xiv stack plan --plan <file>\`. Excluded issues are recorded and shown in
+  \`xiv stack status\`, never built.
 
 PREREQUISITES
   - jj installed (brew install jj) and colocated here (xiv stack init).

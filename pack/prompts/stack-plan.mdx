@@ -14,7 +14,12 @@ Plan a **stacked-PR sequence** from the Linear source **{props.source}**.
    (handlers, hooks, UI, wiring), then tests/polish. Respect explicit dependencies and any
    ordering implied by the issue descriptions or Linear sub-issue order. Every issue in the
    source must appear exactly once.
-3. Capture each issue's key (e.g. `ENG-401`) and title. Do **not** invent branch names — the
+3. **Assign each issue a repo.** The available repo keys are: {props.repos}. Set `repo` on
+   every issue to one of these keys. If there is only one key, use it for every issue. With
+   several keys, infer the repo from the issue's labels, project/sub-team, or service named in
+   its title/description (e.g. a "ledger" or Rust issue → the ledger repo). If an issue is not
+   obviously tied to any repo, still pick the most likely key — assignment is refined later.
+4. Capture each issue's key (e.g. `ENG-401`) and title. Do **not** invent branch names — the
    workflow derives those deterministically.
 
 Do NOT write any code, create branches, or make repository changes. This is a read-only
@@ -24,4 +29,4 @@ REQUIRED OUTPUT:
 {props.schema}
 
 Return ONLY raw JSON matching the required output schema, with `issues` in stack order
-(index 0 is the bottom of the stack).
+(index 0 is the bottom of the stack) and a `repo` key on each.

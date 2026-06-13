@@ -12,6 +12,7 @@ import {
   entriesToPush,
   loadStackMapSync,
   prBaseFor,
+  repoKeys,
   saveStackMap,
   staleEntries,
   updateEntry,
@@ -23,6 +24,7 @@ import { agents } from "../agents";
 const inputSchema = z.object({
   stackMapPath: z.string().default(""),
   count: z.number().int().default(5),
+  repo: z.string().default(""),
   reviewers: z.array(z.string()).default(["claude", "codex"]),
 });
 
@@ -63,8 +65,9 @@ export default smithers((ctx) => {
 
   const reviewers = ctx.input.reviewers ?? ["claude", "codex"];
   const mention = reviewers.map((reviewer) => `@${reviewer}`).join(" ");
-  const stale = staleEntries(map);
-  const newBatch = entriesToPush(map, ctx.input.count);
+  const repo = ctx.input.repo || (repoKeys(map)[0] ?? "");
+  const stale = staleEntries(map, repo);
+  const newBatch = entriesToPush(map, repo, ctx.input.count);
 
   return (
     <Workflow name="stack-push">

@@ -14,15 +14,20 @@ import {
   runPassthrough,
   runWorkflow,
   shipInput,
-  stackAmendInput,
-  stackBuildInput,
-  stackPlanInput,
-  stackPushInput,
 } from "./smithers";
-import { ensureJjReady } from "./jj";
-import { runStackInit, runStackPreview, runStackStatus, runStackTriage } from "./stack";
-import { repoSlugFor, resolveStackMapPath } from "./stack-map";
-import type { AbsolutePath, SmithersPassthroughCommand, WorkflowName } from "./types";
+import {
+  parseRepoArgs,
+  runStackAmend,
+  runStackBuild,
+  runStackInit,
+  runStackPlan,
+  runStackPlanFromFile,
+  runStackPreview,
+  runStackPush,
+  runStackStatus,
+  runStackTriage,
+} from "./stack";
+import type { SmithersPassthroughCommand, WorkflowName } from "./types";
 
 const issueIdArg = Args.text({ name: "issueId" }).pipe(
   Args.withDescription("Linear issue key, for example ENG-123."),
@@ -62,6 +67,11 @@ const featureOption = Options.text("feature").pipe(
 );
 const sourceArg = Args.text({ name: "source" }).pipe(
   Args.withDescription("Linear project ID or parent issue key whose sub-issues become the stack."),
+  Args.optional,
+);
+const planOption = Options.text("plan").pipe(
+  Options.withDescription("Persist a resolved plan file (from the stack-plan skill) instead of running the planner."),
+  Options.optional,
 );
 const messageOption = Options.text("message").pipe(
   Options.withAlias("m"),
@@ -80,6 +90,17 @@ const jsonOption = Options.boolean("json").pipe(
 );
 const detachOption = Options.boolean("detach").pipe(
   Options.withDescription("Start the run in the background (smithers up -d) and return immediately, so you can poll with `xiv stack triage`."),
+);
+const repoArgsOption = Options.text("repo").pipe(
+  Options.withDescription("Assign a repo as key=path (repeatable). Omit for a single-repo stack rooted at the current directory."),
+  Options.repeated,
+);
+const repoKeyOption = Options.text("repo").pipe(
+  Options.withDescription("Operate on this repo's substack (a key from the stack map)."),
+  Options.optional,
+);
+const allReposOption = Options.boolean("all-repos").pipe(
+  Options.withDescription("Fan out across every repo in the stack, one pinned run per repo, in parallel."),
 );
 
 function workflowFor(command: "implement" | "review" | "ship"): WorkflowName {
@@ -103,10 +124,6 @@ function toEffect(task: () => Promise<void>): Effect.Effect<void, unknown> {
 
 function smithersHome(): string {
   return defaultSmithersHome();
-}
-
-function stackMapPathFor(feature: string): AbsolutePath {
-  return resolveStackMapPath(smithersHome(), process.cwd(), feature);
 }
 
 function runInstallCommand(): Effect.Effect<void, unknown> {
@@ -145,22 +162,8 @@ function runPassthroughCommand(command: SmithersPassthroughCommand, args: readon
   return toEffect(() => runPassthrough({ smithersHome: smithersHome(), command, args }));
 }
 
-/** Like runWorkflowCommand, but preflights jj first so stack commands fail fast with a friendly hint. */
-function runStackWorkflowCommand(options: {
-  readonly workflow: WorkflowName;
-  readonly input: Record<string, unknown>;
-  readonly detach?: boolean;
-}): Effect.Effect<void, unknown> {
-  return toEffect(async () => {
-    await ensureJjReady(process.cwd());
-    await runWorkflow({
-      smithersHome: smithersHome(),
-      targetCwd: process.cwd(),
-      workflow: options.workflow,
-      input: options.input,
-      detach: options.detach,
-    });
-  });
+function stackContext(feature: string) {
+  return { smithersHome: smithersHome(), targetCwd: process.cwd(), feature };
 }
 
 const howTo = Command.make("how-to", {}, () => Console.log(howToGuide())).pipe(
@@ -270,72 +273,66 @@ const stackInit = Command.make("init", {}, () =>
 
 const stackPlan = Command.make(
   "plan",
-  { source: sourceArg, feature: featureOption, base: baseOption },
-  ({ source, feature, base }) =>
-    runStackWorkflowCommand({
-      workflow: "stack-plan",
-      input: stackPlanInput({
-        source,
-        feature,
-        base,
-        repoSlug: repoSlugFor(process.cwd()),
-        stackMapPath: stackMapPathFor(feature),
-      }),
-    }),
+  { source: sourceArg, feature: featureOption, base: baseOption, repos: repoArgsOption, plan: planOption },
+  ({ source, feature, base, repos, plan }) => {
+    const repoRegistry = parseRepoArgs(repos, base, process.cwd());
+    const planPath = optionValue(plan);
+    if (planPath !== undefined) {
+      return toEffect(() => runStackPlanFromFile(stackContext(feature), { planPath, repos: repoRegistry }));
+    }
+    const resolvedSource = optionValue(source);
+    if (resolvedSource === undefined) {
+      return Effect.fail(new Error("Provide a <source> (Linear project or parent issue) or --plan <file>."));
+    }
+    return toEffect(() => runStackPlan(stackContext(feature), { source: resolvedSource, repos: repoRegistry }));
+  },
 ).pipe(
-  Command.withDescription("Fetch a Linear project/parent issue, linearize its issues into a stack, and write the stack map."),
+  Command.withDescription("Plan a stack: fetch a Linear project/parent and assign issues to repos, or persist a resolved --plan <file> from the stack-plan skill. --repo key=path (repeatable) for multi-repo."),
 );
 
-const stackBuild = Command.make("build", { feature: featureOption, detach: detachOption }, ({ feature, detach }) =>
-  runStackWorkflowCommand({
-    workflow: "stack-build",
-    input: stackBuildInput({ stackMapPath: stackMapPathFor(feature) }),
-    detach,
-  }),
+const stackBuild = Command.make(
+  "build",
+  { feature: featureOption, repo: repoKeyOption, allRepos: allReposOption, detach: detachOption },
+  ({ feature, repo, allRepos, detach }) =>
+    toEffect(() => runStackBuild(stackContext(feature), { repo: optionValue(repo), allRepos, detach })),
 ).pipe(
-  Command.withDescription("Build every pending stack entry on its own branch, locally, bottom to top. Resumable. --detach to run overnight in the background."),
+  Command.withDescription("Build entries locally, bottom to top. Resumable. --all-repos fans out per repo (parallel); --repo <key> builds one; --detach runs in the background."),
 );
 
 const stackStatus = Command.make("status", { feature: featureOption }, ({ feature }) =>
-  toEffect(() => runStackStatus({ smithersHome: smithersHome(), targetCwd: process.cwd(), feature })),
+  toEffect(() => runStackStatus(stackContext(feature))),
 ).pipe(
-  Command.withDescription("Print the stack map: positions, statuses, branches, and PRs."),
+  Command.withDescription("Print the stack map (grouped by repo): positions, statuses, branches, and PRs."),
 );
 
 const stackPreview = Command.make("preview", { feature: featureOption }, ({ feature }) =>
-  toEffect(() => runStackPreview({ smithersHome: smithersHome(), targetCwd: process.cwd(), feature })),
+  toEffect(() => runStackPreview(stackContext(feature))),
 ).pipe(
-  Command.withDescription("Check out the stack tip to preview the whole feature locally."),
+  Command.withDescription("Check out every repo at its stack tip to preview the whole feature locally."),
 );
 
 const stackTriage = Command.make("triage", { feature: featureOption, json: jsonOption }, ({ feature, json }) =>
-  toEffect(() => runStackTriage({ smithersHome: smithersHome(), targetCwd: process.cwd(), feature }, { json })),
+  toEffect(() => runStackTriage(stackContext(feature), { json })),
 ).pipe(
-  Command.withDescription("Print a compact, structured status (phase + suggested next action) for operating the stack."),
+  Command.withDescription("Print a compact, structured status (overall + per-repo action) for operating the stack."),
 );
 
 const stackPush = Command.make(
   "push",
-  { feature: featureOption, count: countOption },
-  ({ feature, count }) =>
-    runStackWorkflowCommand({
-      workflow: "stack-push",
-      input: stackPushInput({ stackMapPath: stackMapPathFor(feature), count }),
-    }),
+  { feature: featureOption, count: countOption, repo: repoKeyOption, allRepos: allReposOption },
+  ({ feature, count, repo, allRepos }) =>
+    toEffect(() => runStackPush(stackContext(feature), { count, repo: optionValue(repo), allRepos })),
 ).pipe(
-  Command.withDescription("Publish the next N built entries as stacked PRs, and re-sync re-flowed open PRs."),
+  Command.withDescription("Publish the next N built entries as stacked PRs, and re-sync re-flowed open PRs. --all-repos / --repo <key> for multi-repo."),
 );
 
 const stackAmend = Command.make(
   "amend",
-  { feature: featureOption, message: messageOption, target: targetOption },
-  ({ feature, message, target }) =>
-    runStackWorkflowCommand({
-      workflow: "stack-amend",
-      input: stackAmendInput({ stackMapPath: stackMapPathFor(feature), message, target: optionValue(target) }),
-    }),
+  { feature: featureOption, message: messageOption, target: targetOption, repo: repoKeyOption },
+  ({ feature, message, target, repo }) =>
+    toEffect(() => runStackAmend(stackContext(feature), { message, target: optionValue(target), repo: optionValue(repo) })),
 ).pipe(
-  Command.withDescription("Apply a change to a stack entry and re-flow it through every descendant."),
+  Command.withDescription("Apply a change to a stack entry and re-flow it through its repo's descendants. --target <issue> or --repo <key> for multi-repo."),
 );
 
 const stack = Command.make("stack", {}, () =>
