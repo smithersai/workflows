@@ -27,6 +27,9 @@ normal git repo with normal branches and PRs — you `git checkout pr-17` and re
 usual tools as always. The rule: **read** with git, **edit/restack** through `jj` or `xiv stack`.
 Requires `jj` on `PATH` (`brew install jj`).
 
+Run `xiv how-to` any time for the full orchestration runbook — it's also what the `xiv-operator`
+skill points agents at to get up to speed.
+
 ```bash
 cd /path/to/target-repo
 xiv stack init                                   # one-time: jj git init --colocate

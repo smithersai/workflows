@@ -1,7 +1,6 @@
 import {
   type AgentLike,
   ClaudeCodeAgent as SmithersClaudeCodeAgent,
-  PiAgent as SmithersPiAgent,
 } from "smithers-orchestrator";
 import { ClaudeCodeAgent } from "./agents/claude-code";
 import { CodexAgent } from "./agents/codex";
@@ -17,7 +16,6 @@ const NEVER_MERGE_PROMPT =
 interface Providers {
   readonly claude: AgentLike;
   readonly codex: AgentLike;
-  readonly pi: AgentLike;
   readonly claudeSonnet: AgentLike;
   readonly claudeAuto: AgentLike;
 }
@@ -32,13 +30,12 @@ interface AgentPools {
 export const providers: Providers = {
   claude: ClaudeCodeAgent,
   codex: CodexAgent,
-  pi: new SmithersPiAgent({ provider: "openai", model: "gpt-5.3-codex" }),
   claudeSonnet: new SmithersClaudeCodeAgent({
-    model: "claude-sonnet-4-7",
+    model: "claude-sonnet-4-6",
     cwd: process.env.SMITHERS_TARGET_CWD ?? process.cwd(),
   }),
   claudeAuto: new SmithersClaudeCodeAgent({
-    model: "claude-opus-4-7",
+    model: "claude-opus-4-8",
     cwd: process.env.SMITHERS_TARGET_CWD ?? process.cwd(),
     permissionMode: "bypassPermissions",
     appendSystemPrompt: NEVER_MERGE_PROMPT,
@@ -46,7 +43,7 @@ export const providers: Providers = {
 };
 
 export const agents: AgentPools = {
-  cheapFast: [providers.claudeSonnet, providers.pi],
+  cheapFast: [providers.claudeSonnet, providers.codex],
   smart: [providers.codex, providers.claude],
   smartTool: [providers.claude, providers.codex],
   autonomous: [providers.claudeAuto, providers.codex],

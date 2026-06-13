@@ -2,6 +2,7 @@
 import { Args, Command, Options } from "@effect/cli";
 import { BunContext, BunRuntime } from "@effect/platform-bun";
 import { Console, Effect, Option } from "effect";
+import { howToGuide } from "./howto";
 import { installPack } from "./manifest";
 import { defaultSmithersHome, packagedPackRoot } from "./paths";
 import {
@@ -161,6 +162,10 @@ function runStackWorkflowCommand(options: {
     });
   });
 }
+
+const howTo = Command.make("how-to", {}, () => Console.log(howToGuide())).pipe(
+  Command.withDescription("Print the orchestration runbook: how to drive a Linear feature to completion with `xiv stack`."),
+);
 
 const init = Command.make("init", {}, runInstallCommand).pipe(
   Command.withDescription("Install the managed Smithers workflow pack into SMITHERS_HOME."),
@@ -354,6 +359,7 @@ const root = Command.make("xiv", {}, () =>
 ).pipe(
   Command.withDescription("Run the xiv Smithers workflows from the current repository."),
   Command.withSubcommands([
+    howTo,
     init,
     update,
     implement,

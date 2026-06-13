@@ -3,7 +3,7 @@ import type { AbsolutePath, JjPreflight, ProcessResult } from "./types";
 
 const INSTALL_HINT = "Install it with `brew install jj` (or see https://github.com/jj-vcs/jj), then retry.";
 const COLOCATE_HINT =
-  "Colocate jj in this repo with `jj git init --colocate` (adds .jj/ next to .git/; reversible with `rm -rf .jj`).";
+  "Run `xiv stack init` here to colocate jj (it runs `jj git init --colocate` — adds .jj/ next to .git/, reversible with `rm -rf .jj`).";
 
 /** Run a `jj` subcommand in `cwd`, capturing output. Never throws on a missing binary (code 127). */
 export function runJj(args: readonly string[], cwd: AbsolutePath): Promise<ProcessResult> {

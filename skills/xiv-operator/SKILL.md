@@ -4,6 +4,7 @@ description: Operate and babysit xiv stacked-PR runs. Start, monitor, and safely
 metadata:
   internal: false
 allowed-tools:
+  - Bash(xiv how-to:*)
   - Bash(xiv stack triage:*)
   - Bash(xiv stack status:*)
   - Bash(xiv stack build:*)
@@ -29,6 +30,10 @@ You are not a coder. You never edit files, never review code, never decide produ
 questions. You keep healthy runs alive and escalate everything you can't safely fix.
 
 The human gives you a **feature slug** (e.g. `checkout`). Use it as `--feature <slug>` everywhere.
+
+**First, learn the lifecycle:** run `xiv how-to` once. It is the canonical runbook for driving a
+feature (plan → build → preview → push → amend) and explains how `xiv stack triage`'s `action`
+field tells you the next command. This skill is the *recovery* layer on top of that runbook.
 
 ## The loop
 

@@ -6,6 +6,7 @@ in `SKILL.md`). `<slug>` is the feature slug the human gave you.
 ## Observe (read-only — always safe)
 
 ```bash
+xiv how-to                                 # the orchestration runbook (read once to learn the lifecycle)
 xiv stack triage --feature <slug> --json   # PRIMARY: structured status + suggested action + raw run list
 xiv stack triage --feature <slug>          # same, human-readable
 xiv stack status  --feature <slug>         # the full stack map: every entry's status, branch, PR
