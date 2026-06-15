@@ -10,10 +10,15 @@ const reviewIssueSchema = z.object({
   description: z.string(),
 });
 
+// Reviews are best-effort advisory inputs to the impl loop's `done` check. A reviewer
+// agent occasionally returns malformed output (e.g. echoes injected plugin context
+// instead of the review JSON). Defaulting every field keeps that from throwing
+// INVALID_OUTPUT and killing the whole build: a malformed review degrades to
+// `approved: false` (never a false approval), so the loop simply continues/retries.
 export const reviewOutputSchema = z.object({
-  reviewer: z.string(),
-  approved: z.boolean(),
-  feedback: z.string(),
+  reviewer: z.string().default("unknown"),
+  approved: z.boolean().default(false),
+  feedback: z.string().default(""),
   issues: z.array(reviewIssueSchema).default([]),
 });
 

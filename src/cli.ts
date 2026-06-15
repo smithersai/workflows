@@ -24,6 +24,7 @@ import {
   runStackPlanFromFile,
   runStackPreview,
   runStackPush,
+  runStackReview,
   runStackStatus,
   runStackTriage,
 } from "./stack";
@@ -84,6 +85,14 @@ const targetOption = Options.text("target").pipe(
 const countOption = Options.integer("count").pipe(
   Options.withDescription("How many built-but-unpublished entries to publish this batch."),
   Options.withDefault(5),
+);
+const reviewersOption = Options.text("reviewers").pipe(
+  Options.withDescription("Comma-separated reviewer handles to poll and re-request (default: claude,codex)."),
+  Options.withDefault("claude,codex"),
+);
+const draftOption = Options.boolean("draft").pipe(
+  Options.withDescription("Open each PR as a draft. Default true; pass --no-draft to open ready-for-review PRs."),
+  Options.withDefault(true),
 );
 const jsonOption = Options.boolean("json").pipe(
   Options.withDescription("Emit the triage report as JSON for an operator agent to parse."),
@@ -264,6 +273,12 @@ const ui = Command.make("ui", { args: trailingArgs }, ({ args }) => runPassthrou
 const inspect = Command.make("inspect", { args: trailingArgs }, ({ args }) => runPassthroughCommand("inspect", args)).pipe(
   Command.withDescription("Forward to `smithers inspect` in SMITHERS_HOME."),
 );
+const down = Command.make("down", { args: trailingArgs }, ({ args }) => runPassthroughCommand("down", args)).pipe(
+  Command.withDescription("Cancel ALL active/orphaned Smithers runs (like `docker compose down`). Use to clear stale 'running' runs."),
+);
+const cancel = Command.make("cancel", { args: trailingArgs }, ({ args }) => runPassthroughCommand("cancel", args)).pipe(
+  Command.withDescription("Forward to `smithers cancel` in SMITHERS_HOME (cancel a specific run)."),
+);
 
 const stackInit = Command.make("init", {}, () =>
   toEffect(() => runStackInit({ targetCwd: process.cwd() })),
@@ -319,11 +334,29 @@ const stackTriage = Command.make("triage", { feature: featureOption, json: jsonO
 
 const stackPush = Command.make(
   "push",
-  { feature: featureOption, count: countOption, repo: repoKeyOption, allRepos: allReposOption },
-  ({ feature, count, repo, allRepos }) =>
-    toEffect(() => runStackPush(stackContext(feature), { count, repo: optionValue(repo), allRepos })),
+  { feature: featureOption, count: countOption, repo: repoKeyOption, allRepos: allReposOption, draft: draftOption },
+  ({ feature, count, repo, allRepos, draft }) =>
+    toEffect(() => runStackPush(stackContext(feature), { count, repo: optionValue(repo), allRepos, draft })),
 ).pipe(
   Command.withDescription("Publish the next N built entries as stacked PRs, and re-sync re-flowed open PRs. --all-repos / --repo <key> for multi-repo."),
+);
+
+const stackReview = Command.make(
+  "review",
+  { feature: featureOption, repo: repoKeyOption, allRepos: allReposOption, reviewers: reviewersOption, detach: detachOption },
+  ({ feature, repo, allRepos, reviewers, detach }) =>
+    toEffect(() =>
+      runStackReview(stackContext(feature), {
+        repo: optionValue(repo),
+        allRepos,
+        reviewers: reviewers.split(",").map((handle) => handle.trim()).filter((handle) => handle.length > 0),
+        detach,
+      }),
+    ),
+).pipe(
+  Command.withDescription(
+    "Drive open stacked PRs to all-reviewers-approved: read findings across the stack, fix each in its owning branch via jj (cascade up), push, re-request, and loop. NEVER merges. --all-repos / --repo <key> for multi-repo; --detach to background.",
+  ),
 );
 
 const stackAmend = Command.make(
@@ -347,6 +380,7 @@ const stack = Command.make("stack", {}, () =>
     stackPreview,
     stackTriage,
     stackPush,
+    stackReview,
     stackAmend,
   ]),
 );
@@ -369,6 +403,8 @@ const root = Command.make("xiv", {}, () =>
     logs,
     ui,
     inspect,
+    down,
+    cancel,
   ]),
 );
 

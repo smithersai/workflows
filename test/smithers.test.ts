@@ -9,6 +9,7 @@ import {
   stackBuildInput,
   stackPlanInput,
   stackPushInput,
+  stackReviewInput,
 } from "../src/smithers";
 
 describe("workflow input builders", () => {
@@ -84,13 +85,27 @@ describe("workflow input builders", () => {
   });
 
   test("builds stack push input, with and without a repo scope", () => {
-    expect(stackPushInput({ stackMapPath: "/p/checkout.json", count: 5 })).toEqual({
+    expect(stackPushInput({ stackMapPath: "/p/checkout.json", count: 5, draft: true })).toEqual({
       stackMapPath: "/p/checkout.json",
       count: 5,
+      draft: true,
     });
-    expect(stackPushInput({ stackMapPath: "/p/checkout.json", count: 5, repo: "web" })).toEqual({
+    expect(stackPushInput({ stackMapPath: "/p/checkout.json", count: 5, repo: "web", draft: false })).toEqual({
       stackMapPath: "/p/checkout.json",
       count: 5,
+      draft: false,
+      repo: "web",
+    });
+  });
+
+  test("builds stack review input, with and without a repo scope", () => {
+    expect(stackReviewInput({ stackMapPath: "/p/checkout.json", reviewers: ["claude", "codex"] })).toEqual({
+      stackMapPath: "/p/checkout.json",
+      reviewers: ["claude", "codex"],
+    });
+    expect(stackReviewInput({ stackMapPath: "/p/checkout.json", repo: "web", reviewers: ["claude"] })).toEqual({
+      stackMapPath: "/p/checkout.json",
+      reviewers: ["claude"],
       repo: "web",
     });
   });

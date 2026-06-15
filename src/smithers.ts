@@ -133,10 +133,33 @@ export interface StackPushCommand {
   readonly count: number;
   /** Publish only this repo's substack. Omit for a single-repo stack. */
   readonly repo?: RepoKey;
+  /** Open each PR as a draft (default true for batch publishing). */
+  readonly draft: boolean;
 }
 
 export function stackPushInput(command: StackPushCommand): Record<string, unknown> {
-  const input: Record<string, unknown> = { stackMapPath: command.stackMapPath, count: command.count };
+  const input: Record<string, unknown> = {
+    stackMapPath: command.stackMapPath,
+    count: command.count,
+    draft: command.draft,
+  };
+  if (command.repo !== undefined) input.repo = command.repo;
+  return input;
+}
+
+export interface StackReviewCommand {
+  readonly stackMapPath: AbsolutePath;
+  /** Review only this repo's substack. Omit for a single-repo stack. */
+  readonly repo?: RepoKey;
+  /** Reviewer handles to poll and re-request (e.g. ["claude", "codex"]). */
+  readonly reviewers: readonly string[];
+}
+
+export function stackReviewInput(command: StackReviewCommand): Record<string, unknown> {
+  const input: Record<string, unknown> = {
+    stackMapPath: command.stackMapPath,
+    reviewers: command.reviewers,
+  };
   if (command.repo !== undefined) input.repo = command.repo;
   return input;
 }

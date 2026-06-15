@@ -19,8 +19,9 @@ export type WorkflowName =
   | "stack-plan"
   | "stack-build"
   | "stack-amend"
-  | "stack-push";
-export type SmithersPassthroughCommand = "ps" | "logs" | "ui" | "inspect";
+  | "stack-push"
+  | "stack-review";
+export type SmithersPassthroughCommand = "ps" | "logs" | "ui" | "inspect" | "down" | "cancel";
 
 /** Lifecycle of a single entry (issue/branch) within a stack, bottom to top. */
 export type StackStatus =
@@ -182,6 +183,10 @@ export interface JjPreflight {
   readonly available: boolean;
   readonly isRepo: boolean;
   readonly version: string | null;
+  /** The jj workspace root resolved from cwd (jj walks up), or null. */
+  readonly root: AbsolutePath | null;
+  /** The git toplevel of cwd, or null if cwd isn't inside a git repo. */
+  readonly gitRoot: AbsolutePath | null;
 }
 
 /** Where a stack is in its lifecycle, derived purely from the stack map. */

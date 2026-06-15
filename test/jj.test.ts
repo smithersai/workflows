@@ -18,21 +18,34 @@ describe("jjPreflightError", () => {
   const cwd = "/Users/me/code/app";
 
   test("flags a missing binary with an install hint", () => {
-    const preflight: JjPreflight = { available: false, isRepo: false, version: null };
+    const preflight: JjPreflight = { available: false, isRepo: false, version: null, root: null, gitRoot: null };
     const error = jjPreflightError(preflight, cwd);
     expect(error).toContain("not found on PATH");
     expect(error).toContain("brew install jj");
   });
 
   test("flags a non-jj repo with a colocate hint", () => {
-    const preflight: JjPreflight = { available: true, isRepo: false, version: "0.28.0" };
+    const preflight: JjPreflight = { available: true, isRepo: false, version: "0.28.0", root: null, gitRoot: cwd };
     const error = jjPreflightError(preflight, cwd);
     expect(error).toContain("not a jj repository");
     expect(error).toContain("jj git init --colocate");
   });
 
-  test("returns null when jj is installed and the repo is colocated", () => {
-    const preflight: JjPreflight = { available: true, isRepo: true, version: "0.28.0" };
+  test("flags an ancestor jj workspace shadowing this repo", () => {
+    const preflight: JjPreflight = {
+      available: true,
+      isRepo: true,
+      version: "0.28.0",
+      root: "/Users/me/code",
+      gitRoot: "/Users/me/code/app",
+    };
+    const error = jjPreflightError(preflight, cwd);
+    expect(error).toContain("rooted at /Users/me/code");
+    expect(error).toContain("shadowing");
+  });
+
+  test("returns null when jj is colocated at this repo's root", () => {
+    const preflight: JjPreflight = { available: true, isRepo: true, version: "0.28.0", root: cwd, gitRoot: cwd };
     expect(jjPreflightError(preflight, cwd)).toBeNull();
   });
 });

@@ -5,14 +5,19 @@ import { Review } from "~/components/Review";
 import ImplementPrompt from "~/prompts/implement.mdx";
 import ValidatePrompt from "~/prompts/validate.mdx";
 
+// `summary` is a free-text report and is NOT load-bearing (nothing reads outputs.implement;
+// only validate.allPassed/failingSummary drive control flow). A reviewer/implementer agent
+// occasionally returns incomplete structured output (missing summary) — defaulting it keeps a
+// flaky agent from throwing INVALID_OUTPUT and death-spiralling the build. The real implement
+// work is the files written via tools, which persist regardless of the summary field.
 export const implementOutputSchema = z.object({
-  summary: z.string(),
+  summary: z.string().default(""),
   filesChanged: z.array(z.string()).default([]),
   allTestsPassing: z.boolean().default(true),
 });
 
 export const validateOutputSchema = z.object({
-  summary: z.string(),
+  summary: z.string().default(""),
   allPassed: z.boolean().default(true),
   failingSummary: z.string().nullable().default(null),
 });

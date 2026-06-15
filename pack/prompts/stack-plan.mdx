@@ -6,8 +6,13 @@ Plan a **stacked-PR sequence** from the Linear source **{props.source}**.
 (e.g. `ENG-400`). Using the Linear MCP tools available to you (`linear` / `get_project` /
 `get_issue` / `list_issues` / `list_comments`), do the following:
 
-1. **Resolve the source.** If it is a project, list its issues. If it is a parent issue,
-   list its sub-issues. Record the project id and/or parent issue key when present.
+1. **Enumerate the work items.** `{props.source}` is a CONTAINER, not a work item itself.
+   - If it is a **parent issue** (e.g. `ENG-3370`): call `list_issues` with `parentId: "{props.source}"`
+     to get its **sub-issues**. The parent issue is NOT a stack entry — do not include it.
+   - If it is a **project**: `list_issues` with that project to get its issues.
+   Record the project id and/or parent issue key as provenance. You MUST end up with one entry per
+   sub-issue/issue — never just the container. If `list_issues` returns nothing, say so and stop;
+   do not return the container as the result.
 2. **Order the issues into a stack**, bottom to top. The order is the sequence in which the
    issues should be built so each one stacks cleanly on the previous: foundational work
    first (schemas, types, contracts, data layer), then the pieces that depend on it

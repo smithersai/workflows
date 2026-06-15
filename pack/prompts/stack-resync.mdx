@@ -7,8 +7,9 @@ Steps (use `git` and `gh` directly):
 
 1. Force-push the rewritten branch safely:
    `git push --force-with-lease origin {props.branch}`.
-2. Post one re-review comment:
-   `gh pr comment {props.prNumber} --body "{props.reviewersMention} re-review — re-flowed from an upstream stack amend; please re-review."`
+2. Post one re-review comment on PR #{props.prNumber} with `gh pr comment`.
+   The comment body MUST be exactly (interpolated handles, do not alter):
+   {props.reviewersMention} re-review — re-flowed from an upstream stack amend; please re-review.
 
 Then capture the new head SHA: `git rev-parse {props.branch}`.
 

@@ -7,8 +7,9 @@ Steps (use `gh` / `git`):
 1. Read the PR to confirm it exists and is open, and capture its URL and head SHA:
    `gh pr view {props.prNumber} --json number,url,headRefOid,state`.
    If it is not open, stop and report the problem — do not create a new PR.
-2. Post the review-trigger comment:
-   `gh pr comment {props.prNumber} --body "{props.reviewersMention} review"`.
+2. Post the review-trigger comment on PR #{props.prNumber} with `gh pr comment`.
+   The comment body MUST be exactly (interpolated handles, do not alter):
+   {props.reviewersMention} review
 
 Do NOT create a new PR, do NOT push code, and NEVER merge (`gh pr merge` is forbidden).
 Posting the trigger comment is the only mutating action.

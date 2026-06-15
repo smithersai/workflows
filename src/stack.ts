@@ -9,6 +9,7 @@ import {
   stackBuildInput,
   stackPlanInput,
   stackPushInput,
+  stackReviewInput,
 } from "./smithers";
 import {
   createStackMap,
@@ -40,10 +41,14 @@ import type {
 } from "./types";
 
 /** What `xiv stack init` should do, decided purely from a jj preflight result. */
-export type StackInitAction = "install-jj" | "already-colocated" | "colocate";
+export type StackInitAction = "install-jj" | "not-git-repo" | "ancestor-jj" | "already-colocated" | "colocate";
 
 export function stackInitAction(preflight: JjPreflight): StackInitAction {
   if (!preflight.available) return "install-jj";
+  if (preflight.gitRoot === null) return "not-git-repo";
+  if (preflight.isRepo && preflight.root !== null && resolve(preflight.root) !== resolve(preflight.gitRoot)) {
+    return "ancestor-jj";
+  }
   if (preflight.isRepo) return "already-colocated";
   return "colocate";
 }
@@ -179,7 +184,7 @@ export function stackTriage(map: StackMap): TriageReport {
 }
 
 async function requireStackMap(context: StackCommandContext): Promise<{ path: AbsolutePath; map: StackMap }> {
-  const path = resolveStackMapPath(context.smithersHome, context.targetCwd, context.feature);
+  const path = resolveStackMapPath(context.smithersHome, context.feature);
   const map = await loadStackMap(path);
   if (map === null) {
     throw new Error(`No stack map for feature "${context.feature}" at ${path}. Run \`xiv stack plan\` first.`);
@@ -198,6 +203,14 @@ export async function runStackInit(context: { readonly targetCwd: AbsolutePath }
     case "install-jj":
       throw new Error(
         "jj (Jujutsu) is not installed. Install it with `brew install jj` (https://github.com/jj-vcs/jj), then run `xiv stack init` again.",
+      );
+    case "not-git-repo":
+      throw new Error(
+        `${context.targetCwd} is not a git repository. cd into the repo you want to stack and run \`xiv stack init\` there — do NOT run it in a parent directory that holds multiple repos (that would colocate jj over all of them).`,
+      );
+    case "ancestor-jj":
+      throw new Error(
+        `jj here resolves to ${preflight.root}, not this repo (${preflight.gitRoot}) — a stray jj workspace in a parent directory is shadowing it. Remove ${preflight.root}/.jj (and a stray ${preflight.root}/.git if a colocate created one), then run \`xiv stack init\` here again.`,
       );
     case "already-colocated":
       console.log(`jj already colocated in ${context.targetCwd} (jj ${preflight.version ?? "?"}). Repo is ready.`);
@@ -224,7 +237,7 @@ export async function runStackTriage(
   context: StackCommandContext,
   options: { readonly json: boolean },
 ): Promise<void> {
-  const path = resolveStackMapPath(context.smithersHome, context.targetCwd, context.feature);
+  const path = resolveStackMapPath(context.smithersHome, context.feature);
   const map = await loadStackMap(path);
   const report: TriageReport =
     map === null
@@ -307,8 +320,9 @@ export async function runStackPlan(
   context: StackCommandContext,
   options: { readonly source: string; readonly repos: Record<RepoKey, RepoConfig> },
 ): Promise<void> {
-  await ensureJjReady(context.targetCwd);
-  const path = resolveStackMapPath(context.smithersHome, context.targetCwd, context.feature);
+  // No jj preflight here: planning only reads Linear and writes the map. jj is required per-repo
+  // at build/amend/push time (checked there), so `plan` runs from anywhere.
+  const path = resolveStackMapPath(context.smithersHome, context.feature);
   await runWorkflow({
     smithersHome: context.smithersHome,
     targetCwd: context.targetCwd,
@@ -331,9 +345,23 @@ export async function runStackPlanFromFile(
   context: StackCommandContext,
   options: { readonly planPath: AbsolutePath; readonly repos: Record<RepoKey, RepoConfig> },
 ): Promise<void> {
-  const plan = parsePlanFile(JSON.parse(await readFile(options.planPath, "utf8")));
+  let raw: string;
+  try {
+    raw = await readFile(options.planPath, "utf8");
+  } catch {
+    throw new Error(`Plan file not found or unreadable: ${options.planPath}`);
+  }
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(
+      `Plan file ${options.planPath} is not valid JSON (${error instanceof Error ? error.message : String(error)}). It's likely incomplete — re-write it and check with \`python3 -m json.tool ${options.planPath}\`.`,
+    );
+  }
+  const plan = parsePlanFile(json);
   const entries = planToEntries(plan.order, options.repos);
-  const path = resolveStackMapPath(context.smithersHome, context.targetCwd, context.feature);
+  const path = resolveStackMapPath(context.smithersHome, context.feature);
   const map = createStackMap({
     feature: context.feature,
     repoSlug: repoSlugFor(context.targetCwd),
@@ -376,7 +404,7 @@ export async function runStackBuild(
 
 export async function runStackPush(
   context: StackCommandContext,
-  options: { readonly repo?: RepoKey; readonly allRepos: boolean; readonly count: number },
+  options: { readonly repo?: RepoKey; readonly allRepos: boolean; readonly count: number; readonly draft: boolean },
 ): Promise<void> {
   const { path, map } = await requireStackMap(context);
   const targets = options.allRepos ? repoKeys(map) : [resolveSingleRepo(map, options.repo)];
@@ -388,7 +416,32 @@ export async function runStackPush(
       smithersHome: context.smithersHome,
       targetCwd: config.path,
       workflow: "stack-push",
-      input: stackPushInput({ stackMapPath: path, count: options.count, repo }),
+      input: stackPushInput({ stackMapPath: path, count: options.count, repo, draft: options.draft }),
+    });
+  }
+}
+
+export async function runStackReview(
+  context: StackCommandContext,
+  options: {
+    readonly repo?: RepoKey;
+    readonly allRepos: boolean;
+    readonly reviewers: readonly string[];
+    readonly detach: boolean;
+  },
+): Promise<void> {
+  const { path, map } = await requireStackMap(context);
+  const targets = options.allRepos ? repoKeys(map) : [resolveSingleRepo(map, options.repo)];
+  for (const repo of targets) {
+    const config = repoConfigOrThrow(map, repo);
+    await ensureJjReady(config.path);
+    console.log(`review: ${repo} (${config.path})${options.allRepos ? " [detached]" : ""}`);
+    await runWorkflow({
+      smithersHome: context.smithersHome,
+      targetCwd: config.path,
+      workflow: "stack-review",
+      input: stackReviewInput({ stackMapPath: path, repo, reviewers: options.reviewers }),
+      detach: options.allRepos ? true : options.detach,
     });
   }
 }

@@ -25,6 +25,7 @@ const inputSchema = z.object({
   stackMapPath: z.string().default(""),
   count: z.number().int().default(5),
   repo: z.string().default(""),
+  draft: z.boolean().default(true),
   reviewers: z.array(z.string()).default(["claude", "codex"]),
 });
 
@@ -122,7 +123,7 @@ export default smithers((ctx) => {
                 timeoutMs={900_000}
                 heartbeatTimeoutMs={300_000}
               >
-                <PrOpenPrompt branch={entry.branchName} base={base} title={title} body={body} reviewersMention={mention} />
+                <PrOpenPrompt branch={entry.branchName} base={base} title={title} body={body} draft={ctx.input.draft} reviewersMention={mention} />
               </Task>
               <Task
                 id={`push:open-record:${entry.issueId}`}

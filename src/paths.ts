@@ -10,14 +10,18 @@ export function packagedPackRoot(): AbsolutePath {
   return join(repoRoot(), "pack");
 }
 
-/** Root directory under SMITHERS_HOME where per-repo stack maps live. */
+/** Root directory under SMITHERS_HOME where stack maps live. */
 export function stacksRoot(smithersHome: AbsolutePath): AbsolutePath {
   return join(smithersHome, "stacks");
 }
 
-/** Path to a single feature's stack map: `<SMITHERS_HOME>/stacks/<repoSlug>/<feature>.json`. */
-export function stackMapPath(smithersHome: AbsolutePath, repoSlug: string, feature: string): AbsolutePath {
-  return join(stacksRoot(smithersHome), repoSlug, `${feature}.json`);
+/**
+ * Path to a feature's stack map: `<SMITHERS_HOME>/stacks/<feature>.json`. Keyed by feature alone
+ * (not by cwd) so every `xiv stack` command finds it from anywhere — the repos a feature
+ * spans are recorded inside the map, not implied by where you stand.
+ */
+export function stackMapPath(smithersHome: AbsolutePath, feature: string): AbsolutePath {
+  return join(stacksRoot(smithersHome), `${feature}.json`);
 }
 
 export function defaultSmithersHome(env: NodeJS.ProcessEnv = process.env): AbsolutePath {

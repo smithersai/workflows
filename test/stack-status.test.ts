@@ -48,23 +48,34 @@ describe("stackStatusReport", () => {
 });
 
 describe("stackInitAction", () => {
+  const repo = "/Users/me/code/app";
   const preflight = (over: Partial<JjPreflight>): JjPreflight => ({
     available: true,
     isRepo: false,
     version: "0.28.0",
+    root: null,
+    gitRoot: repo,
     ...over,
   });
 
   test("install-jj when jj is missing", () => {
-    expect(stackInitAction(preflight({ available: false, version: null }))).toBe("install-jj");
+    expect(stackInitAction(preflight({ available: false, version: null, gitRoot: null }))).toBe("install-jj");
   });
 
-  test("already-colocated when the repo is a jj repo", () => {
-    expect(stackInitAction(preflight({ isRepo: true }))).toBe("already-colocated");
+  test("not-git-repo when cwd is not inside a git repo (e.g. a parent code dir)", () => {
+    expect(stackInitAction(preflight({ gitRoot: null }))).toBe("not-git-repo");
   });
 
-  test("colocate when jj is present but the repo is plain git", () => {
-    expect(stackInitAction(preflight({ isRepo: false }))).toBe("colocate");
+  test("ancestor-jj when jj resolves to a parent directory, not this repo", () => {
+    expect(stackInitAction(preflight({ isRepo: true, root: "/Users/me/code", gitRoot: repo }))).toBe("ancestor-jj");
+  });
+
+  test("already-colocated when jj is rooted at this repo", () => {
+    expect(stackInitAction(preflight({ isRepo: true, root: repo, gitRoot: repo }))).toBe("already-colocated");
+  });
+
+  test("colocate when jj is present, cwd is a git repo, but not yet a jj repo", () => {
+    expect(stackInitAction(preflight({ isRepo: false, root: null, gitRoot: repo }))).toBe("colocate");
   });
 });
 

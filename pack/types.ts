@@ -9,6 +9,8 @@ export type LinearIssueKey = string;
 export type LinearIssueUrl = string;
 export type SummaryText = string;
 export type MarkdownText = string;
+export type ModelName = string;
+export type ReasoningEffort = "low" | "medium" | "high";
 
 export type ReviewSeverity = "critical" | "major" | "minor" | "nit";
 export type ReviewerKind = "bot" | "human";

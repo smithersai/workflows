@@ -35,7 +35,7 @@ const inputSchema = z.object({
   reviewers: z.array(z.string()).default(["claude", "codex"]),
   maxRounds: z.number().int().default(8),
   pollIntervalSec: z.number().int().default(60),
-  maxAttempts: z.number().int().default(20),
+  maxAttempts: z.number().int().default(30),
 });
 
 const reportSchema = z.object({
@@ -96,7 +96,7 @@ export default smithers((ctx) => {
     <Workflow name="pr-review-loop">
       <Sequence>
         <Task id="open-pr" output={prOpenSchema} agent={agents.autonomous} skipIf={attachToExisting} timeoutMs={900_000} heartbeatTimeoutMs={300_000}>
-          <PrOpenPrompt branch={branch} base={base} title={prTitle} body={prBody} reviewersMention={mention} />
+          <PrOpenPrompt branch={branch} base={base} title={prTitle} body={prBody} draft={false} reviewersMention={mention} />
         </Task>
 
         <Task id="attach-pr" output={prOpenSchema} agent={agents.autonomous} skipIf={!attachToExisting} timeoutMs={300_000} heartbeatTimeoutMs={120_000}>
@@ -105,7 +105,7 @@ export default smithers((ctx) => {
 
         <Loop id="rev:loop" until={done} maxIterations={maxRounds} onMaxReached="return-last">
           <Sequence>
-            <Task id="rev:await" output={reviewStateSchema} agent={agents.autonomous} timeoutMs={1_500_000} heartbeatTimeoutMs={300_000}>
+            <Task id="rev:await" output={reviewStateSchema} agent={agents.autonomous} timeoutMs={2_400_000} heartbeatTimeoutMs={600_000}>
               <PrAwaitReviewsPrompt prNumber={prNumber} reviewers={reviewers.join(", ")} headSha={currentHeadSha} pollIntervalSec={pollIntervalSec} maxAttempts={maxAttempts} />
             </Task>
 

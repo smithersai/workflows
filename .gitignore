@@ -5,3 +5,9 @@ dist/
 tmp/
 .tmp/
 coverage/
+
+# Smithers runtime DB
+*.db
+*.sqlite
+*.db-shm
+*.db-wal

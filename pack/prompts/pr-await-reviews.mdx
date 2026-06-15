@@ -10,21 +10,87 @@ The latest pushed commit is **{props.headSha}**. Only consider reviews and
 comments authored **at or after** that push — earlier ones are stale and were
 already addressed.
 
-## Poll loop
+## Poll loop — run ONE real blocking shell loop (do NOT hand-roll your own sleeps)
 
-Poll roughly every {props.pollIntervalSec} seconds, for up to
-{props.maxAttempts} attempts (sleep between attempts). On each attempt, gather:
+You MUST genuinely wait. The AI reviewers take several minutes to post their
+first response, and `claude[bot]` posts a placeholder immediately and only edits
+in the real review minutes later. Do NOT do a couple of quick `gh` checks and
+return — that returns before anyone has reviewed and wastes the whole outer loop.
+Instead, run a SINGLE foreground shell loop that sleeps between attempts and
+only exits when every expected reviewer has a SUBSTANTIVE (non-placeholder)
+response, or the attempt budget is spent.
 
-- `gh pr view {props.prNumber} --json reviews,latestReviews,reviewDecision,comments`
-- review comments: `gh api repos/{{owner}}/{{repo}}/pulls/{props.prNumber}/comments`
-- issue comments: `gh api repos/{{owner}}/{{repo}}/issues/{props.prNumber}/comments`
+Run the loop below as ONE self-contained shell command — your Bash calls do NOT
+share variables across invocations, so the whole thing must be a single call.
+The only edit you make is the first line: set `PR` to this PR's number, which is
+**{props.prNumber}**. The configured cadence is {props.pollIntervalSec}s ×
+{props.maxAttempts} attempts — change the `INTERVAL`/`MAX` defaults below only if
+those differ from `60`/`30`. Expected reviewers: {props.reviewers} — the skeleton
+checks `claude` + `codex`; **adapt the per-reviewer checks to the actual expected
+reviewers**, and for a human reviewer count any review/comment after `$SINCE`.
 
-(Resolve `{{owner}}/{{repo}}` from `gh repo view --json nameWithOwner`.)
+```bash
+PR=0                                   # <-- set to this PR's number (stated above)
+OR=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
+HEAD=$(gh pr view "$PR" --json headRefOid --jq .headRefOid)            # current pushed head
+SINCE=$(gh api "repos/$OR/commits/$HEAD" --jq .commit.committer.date)  # ignore anything older
+INTERVAL=60; MAX=30
+echo "waiting for reviews on #$PR since $SINCE (head $HEAD)"
+n=0
+while :; do
+  n=$((n+1))
+  # --paginate + jq -s so we see the NEWEST comments, not just the oldest page
+  ic=$(gh api --paginate "repos/$OR/issues/$PR/comments" --jq '.[]' | jq -s '.')
+  rv=$(gh api --paginate "repos/$OR/pulls/$PR/reviews"   --jq '.[]' | jq -s '.')
+  # claude[bot]: an issue-comment edited after SINCE with a real (non-placeholder) body
+  claude=$(echo "$ic" | jq --arg s "$SINCE" '[.[]|select(.user.login=="claude[bot]" and .updated_at>$s and (.body|length>40) and ((.body|ascii_downcase)|test("working|reviewing|take a look|on it")|not))]|length')
+  # codex: a formal review OR comment after SINCE with a real body
+  codex=$(printf '%s\n%s\n' "$rv" "$ic" | jq -s --arg s "$SINCE" 'add|[.[]|select((.user.login|test("codex")) and ((.submitted_at//.updated_at)>$s) and ((.body//"")|length>20))]|length')
+  echo "[attempt $n/$MAX] claude=$claude codex=$codex"
+  test "$claude" -ge 1 && test "$codex" -ge 1 && echo DONE && break
+  test "$n" -ge "$MAX" && echo TIMEOUT && break
+  sleep "$INTERVAL"
+done
+```
 
-Stop polling as soon as **every** expected reviewer AND every human who has
-left a review/comment after `{props.headSha}` has reached a terminal state
-(approved or has findings). If, after `{props.maxAttempts}` attempts, one or
-more are still `pending`, stop and report with `timedOut: true`.
+Run that in the FOREGROUND in one shot — it IS the wait, and each `[attempt …]`
+line is your heartbeat. After it prints `DONE` or `TIMEOUT`, do a final fetch of
+all reviews + issue comments + inline review comments and classify per the
+sections below:
+
+- `gh pr view $PR --json reviews,latestReviews,reviewDecision,comments`
+- inline review comments: `gh api repos/$OR/pulls/$PR/comments`
+- issue comments: `gh api repos/$OR/issues/$PR/comments`
+
+If the loop exited `TIMEOUT` with one or more reviewers still lacking a
+substantive response, set `timedOut: true` and mark those reviewers `pending`.
+For each comment, note `user.login`, `body`, `created_at`, `updated_at`, and the
+comment `id` — you need these to tell a finished review from a placeholder.
+
+## Detecting in-progress reviews (IMPORTANT — claude[bot] edits in place)
+
+Some bots — notably `claude[bot]` — do NOT post their review as a GitHub review
+or as a finished comment. They post an immediate PLACEHOLDER comment, work in the
+background, then EDIT THAT SAME COMMENT in place to add the real findings. The
+comment `id` never changes; only its `body` and `updated_at` change.
+
+A bot comment is a COMPLETED review ONLY if its body contains substantive review
+content — an explicit verdict (e.g. "LGTM", "approve", "looks good", "ready to
+merge", "no issues") OR concrete findings/issues/code references.
+
+Treat the reviewer as still `pending` (NOT terminal — keep polling) if its only
+comment looks in-progress, i.e. ANY of:
+
+- the body matches a placeholder / working marker: contains "working",
+  "reviewing", "I'll take a look", "on it", a lone spinner/emoji (e.g. 👀), or is
+  empty / near-empty;
+- the comment has not yet been edited (`updated_at` == `created_at`) AND carries
+  no review substance.
+
+Because the body updates in place, on each poll RE-READ the latest body of the
+SAME comment `id` — do NOT assume a new comment will appear. Only mark such a
+reviewer `approved` / `findings` once its (possibly edited) body shows real
+content. Never conclude "claude reviewed" off the placeholder alone.
 
 ## Classification
 
@@ -36,7 +102,9 @@ comment after the latest push):
   - `approved` — they approved or clearly said it's good to go / LGTM with no
     open asks.
   - `findings` — they requested changes or raised any unresolved issue/comment.
-  - `pending` — they have not responded after the latest push.
+  - `pending` — they have not responded after the latest push, OR they have only
+    left an in-progress / placeholder comment (see "Detecting in-progress
+    reviews" above).
 - `findings`: list each concrete issue they raised (`path` if file-specific,
   plus the `body`).
 

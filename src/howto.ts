@@ -48,6 +48,11 @@ PREREQUISITES
   - gh authenticated (for push). The claude + codex CLIs logged in, with Linear MCP configured.
   - The repo is a git repo on its base branch (default main; pass --base to plan otherwise).
 
+COST
+  Agents default to a cheap tier (Sonnet for work, Haiku for validate, low codex reasoning) —
+  fine for fully-spec'd Linear work. For a hard feature, prefix the command with
+  XIV_TIER=quality (leads with Opus). A hard cap is available via XIV_AGENT_MAX_USD.
+
 ONE ISSUE (no stack needed)
   xiv implement <ENG-123>     build it on a branch, local
   xiv ship <ENG-123>          build it + open a PR + drive AI review to approval

@@ -30,6 +30,24 @@ Requires `jj` on `PATH` (`brew install jj`).
 Run `xiv how-to` any time for the full orchestration runbook — it's also what the `xiv-operator`
 skill points agents at to get up to speed.
 
+### Model tiers (cost)
+
+Agents default to a **cheap** tier — Claude **Sonnet** for the real work, **Haiku** for mechanical
+steps (validate), and low codex reasoning — which is plenty when the work is already fully spec'd
+in Linear. Claude Code has no separate "thinking level" knob; the model tier *is* the cost/reasoning
+lever. Override per run via env (passed through to the workflow):
+
+| Env | Default (cheap) | Effect |
+|---|---|---|
+| `XIV_TIER=quality` | `cheap` | Lead with **Opus** (Sonnet for light steps) for hard features |
+| `XIV_MODEL_HEAVY` | `claude-sonnet-4-6` | Model for plan/implement/review/git |
+| `XIV_MODEL_LIGHT` | `claude-haiku-4-5-20251001` | Model for validate/fetch |
+| `XIV_CODEX_REASONING` | `low` | codex (fallback) reasoning effort |
+| `XIV_AGENT_MAX_USD` | (none) | Hard per-agent spend cap |
+
+e.g. `XIV_TIER=quality xiv stack build --feature payments --all-repos`. These are **pack settings**,
+so `xiv update` after changing defaults in `pack/agents.ts`.
+
 ```bash
 cd /path/to/target-repo
 xiv stack init                                   # one-time: jj git init --colocate

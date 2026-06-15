@@ -1,0 +1,64 @@
+# Address Stack PR Review Findings (via jj)
+
+Reviewers left findings across a stacked-PR feature. Fix each finding **in the
+commit that owns the code it refers to** — normally that PR's own branch — and
+let jj cascade the rebase upward. This keeps every PR's diff and review trail
+honest: the fix shows up in the PR it belongs to, and only branches *above* it
+move.
+
+Findings to address (grouped by PR/branch, JSON):
+{props.findings}
+
+Stack branches, bottom → top (JSON):
+{props.branchOrder}
+
+You are already in the repo's working copy — a **colocated jj + git** repo. Work
+branch-by-branch, **lowest branch first**, so each cascade rebases the fewest
+descendants.
+
+## For each finding
+
+1. **Find the owning branch.** Normally it's the finding's `branch` (the PR it
+   was raised on). If the commented code was actually introduced lower in the
+   stack, fix it at that lower branch instead — the honest location. A fix must
+   NEVER flow downward into an unrelated lower PR.
+2. **Position on that branch to edit it:**
+   `jj edit --ignore-immutable <branch>`
+   (the branches are already pushed → jj treats them as immutable; the flag is
+   required to rewrite them.)
+3. **Fix it properly** in the code — not a superficial patch. Add or update a
+   meaningful test when the finding concerns behavior. Your edits auto-fold into
+   that branch's commit (no separate `git commit`).
+4. If you deliberately do NOT act on a finding (you disagree, it's out of scope,
+   or it's a false positive), make no code change and record it in `skipped`
+   with an honest, defensible `reason` — it will be posted back to the reviewers.
+
+## After editing (cascade + push)
+
+1. Move off the last edited commit so jj rebases its descendants — e.g.
+   `jj new <top-branch>`. jj prints `Rebased N descendant commits`.
+2. **Verify locally before pushing** where feasible: run lint/typecheck/tests for
+   the touched package(s). Don't push a guess and burn a CI round.
+3. Push every branch that changed — the edited branch(es) **and every descendant
+   the rebase rewrote** (descendants get new SHAs even though their diffs didn't
+   change):
+   `jj git push -b <branchA> -b <branchB> ...`
+   - "Non-tracking remote bookmark … exists" → `jj bookmark track <branch> --remote origin`, then push.
+   - If tracking makes a bookmark divergent → `jj bookmark set <branch> -r <its-commit-hash>`, then push.
+   - jj identity is configured. If you ever hit "no author/committer set", run
+     `jj metaedit --update-author-timestamp -r 'main..@'` and push again.
+
+## Rules
+
+- The cascade only moves the edited branch and the branches **above** it; branches
+  below are untouched. Pushing a rewritten branch force-updates its PR and may
+  dismiss prior approvals — that's expected.
+- NEVER merge any PR. Never run `gh pr merge`; never enable auto-merge.
+- Report each addressed finding (`pr`, `branch`, `finding`, `commit`), each
+  skipped finding (`pr`, `finding`, `reason`), and EVERY branch you pushed in
+  `pushedBranches` (so the re-request step knows which PRs to ping).
+
+REQUIRED OUTPUT:
+{props.schema}
+
+Return ONLY raw JSON matching the required output schema.

@@ -29,8 +29,8 @@ const plannedStackSchema = z.object({
   linearProjectId: z.string().default(""),
   parentIssueId: z.string().default(""),
   issues: z
-    .array(z.object({ issueId: z.string(), issueTitle: z.string().default(""), repo: z.string().default("") }))
-    .default([]),
+    .array(z.object({ issueId: z.string().min(1), issueTitle: z.string().default(""), repo: z.string().default("") }))
+    .min(1, "Return every SUB-issue of the source as a separate entry; the source itself is not an entry."),
 });
 
 const persistSchema = z.object({

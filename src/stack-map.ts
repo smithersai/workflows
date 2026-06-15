@@ -158,12 +158,8 @@ function sanitizeSegment(value: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-export function resolveStackMapPath(
-  smithersHome: AbsolutePath,
-  targetCwd: AbsolutePath,
-  feature: string,
-): AbsolutePath {
-  return stackMapPath(smithersHome, repoSlugFor(targetCwd), slugifyFeature(feature));
+export function resolveStackMapPath(smithersHome: AbsolutePath, feature: string): AbsolutePath {
+  return stackMapPath(smithersHome, slugifyFeature(feature));
 }
 
 /** Read and validate a stack map. Returns null when the file does not exist. */

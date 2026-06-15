@@ -3,9 +3,10 @@
 Fixes have been pushed to pull request **#{props.prNumber}**. Post a single
 re-review comment so the reviewers re-evaluate with full context.
 
-Post with `gh pr comment {props.prNumber} --body "..."`. The comment MUST:
+Post on PR #{props.prNumber} with `gh pr comment`. The comment MUST:
 
-1. Start with the re-review trigger mention: `{props.reviewersMention} re-review`.
+1. Start with the re-review trigger mention, exactly (interpolated handles, do not alter):
+   {props.reviewersMention} re-review
 2. Summarize **what was addressed** (one bullet per item):
 {props.addressed}
 3. Explicitly call out **what was intentionally skipped and why**, so reviewers

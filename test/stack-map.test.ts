@@ -106,9 +106,10 @@ describe("slugs and paths", () => {
     expect(() => slugifyFeature("!!!")).toThrow();
   });
 
-  test("resolveStackMapPath composes home, repo slug, and feature", () => {
-    const path = resolveStackMapPath("/home/.smithers", "/Users/me/code/app", "Checkout Flow");
-    expect(path).toBe(join("/home/.smithers", "stacks", repoSlugFor("/Users/me/code/app"), "checkout-flow.json"));
+  test("resolveStackMapPath is keyed by feature alone (cwd-independent)", () => {
+    expect(resolveStackMapPath("/home/.smithers", "Checkout Flow")).toBe(
+      join("/home/.smithers", "stacks", "checkout-flow.json"),
+    );
   });
 });
 
