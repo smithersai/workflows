@@ -1,11 +1,11 @@
 ---
-name: review-general
-description: General-purpose code review of a proposed change. Gather context first — fetch the associated Linear issue (ENG-#### from the branch name, PR title, or PR description) and check it for acceptance-criteria parity, fetch the open PR for the branch and reconcile against prior review comments without duplicating them, verify prior findings were actually fixed, and confirm the local branch is current with the remote. Then review the diff and report only findings the author would actually fix. Use when the user wants to review a branch, a PR, or work-in-progress changes, or says "review this", "review the change", or invokes /review-general.
+name: xiv-review-core
+description: General-purpose code review of a proposed change. Gather context first — fetch the associated Linear issue (ENG-#### from the branch name, PR title, or PR description) and check it for acceptance-criteria parity, fetch the open PR for the branch and reconcile against prior review comments without duplicating them, verify prior findings were actually fixed, and confirm the local branch is current with the remote. Then review the diff and report only findings the author would actually fix. Use when the user wants to review a branch, a PR, or work-in-progress changes, or says "review this", "review the change", or invokes /xiv-review-core.
 metadata:
   internal: false
 ---
 
-# review-general
+# xiv-review-core
 
 You are acting as a reviewer for a proposed code change made by another engineer.
 
