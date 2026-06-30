@@ -24,6 +24,8 @@ workflows; `xiv` is the thin wrapper that launches and manages them. A command a
 invoke it from, and run state (logs, executions, stack maps) lives under `SMITHERS_HOME` —
 `~/.smithers` by default. The work itself is Linear-issue-driven and lands as normal GitHub branches
 and PRs. After the pack changes, `xiv update` reinstalls the managed workflows into `SMITHERS_HOME`.
+To go deeper on Smithers itself — the concepts, reading runs, and its docs — see
+`references/smithers.md`.
 
 This skill is a **router**. Figure out what the user is trying to do, open the reference doc that
 matches that **intent**, and follow it. Don't read every doc up front. Most tasks need exactly one;
@@ -71,6 +73,7 @@ Match the user's intent to a row, read that doc, then run the command it points 
 | Build a whole Linear feature as a stack of PRs | `references/stack.md` → then the `stack-plan` and `xiv-operator` skills, and `xiv how-to` | `xiv stack …` |
 | Check on, recover, or cancel a running workflow | `references/smithers-ops.md` | `xiv ps` / `logs` / `ui` / `inspect` / `down` / `cancel` |
 | Author, test, or iterate a workflow itself | `references/authoring.md` | `xiv dev` / `check`, `xiv init` / `update` |
+| Understand the engine, read runs fluently, or dig into Smithers' own docs | `references/smithers.md` | (concepts + doc pointers) |
 
 ### The `xiv pr` family — pick deliberately
 

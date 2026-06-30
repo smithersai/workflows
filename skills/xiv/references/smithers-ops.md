@@ -2,7 +2,9 @@
 
 Every `xiv` workflow is a long-running Smithers run living in `SMITHERS_HOME` (default
 `~/.smithers`). These commands are how you observe and recover them — they forward to `smithers`
-under the hood. Run `xiv <command> -h` for current flags.
+under the hood. Run `xiv <command> -h` for current flags. For the concepts *behind* these runs
+(tasks, the persist-each-step render loop, why re-running is safe) and how to reach the Smithers
+docs, see `references/smithers.md`.
 
 ## Observe
 
