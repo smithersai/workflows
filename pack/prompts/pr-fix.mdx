@@ -1,0 +1,54 @@
+# Address PR Review Findings (one-shot)
+
+Pull request **#{props.prNumber}** has review feedback already on it. Gather every finding, address
+the valid ones on the PR branch, push once, and stop. This is a single pass — do NOT wait for new
+reviews, do NOT loop, and do NOT re-request review.
+
+## 1. Gather findings from EVERY comment surface
+
+Reviewers (bots and humans) leave actionable feedback in several places, and missing one means
+silently dropping a real fix. Set these shell variables once (use **{props.prNumber}** as the PR
+number), then read all three surfaces:
+
+```bash
+PR=<the PR number above>
+OR=$(gh repo view --json nameWithOwner -q .nameWithOwner)   # owner/repo
+gh api "repos/$OR/pulls/$PR/reviews"      # formal reviews (state + body)
+gh api "repos/$OR/pulls/$PR/comments"     # inline review (diff) comments — path:line threads
+gh api "repos/$OR/issues/$PR/comments"    # issue/conversation comments
+```
+
+The **issue/conversation** surface is where `claude[bot]`, `chatgpt-codex-connector[bot]`, and
+humans most often post, and it's the one most easily missed — a bot's whole code review is
+frequently a single long comment there. When a bot posted multiple times (a re-review after later
+commits), use the **most recent** and reconcile against the current code. Ignore GitHub's
+resolved/unresolved thread state — judge each finding against the actual code at the PR head.
+
+## 2. Classify and act
+
+For each distinct finding, classify it against the current head:
+
+- **Already fixed** — verify in the code; if so, no action.
+- **Actionable** — fix it properly (not a superficial patch), and add or update a meaningful test
+  when it concerns behavior.
+- **Non-actionable nit / disagreement / out of scope** — do not change code; record it in `skipped`
+  with a clear, honest `reason` (it may be posted back to reviewers, so make it defensible).
+
+## 3. Push once
+
+1. Run the project's tests/lint and make sure they pass.
+2. Commit with a clear message referencing what was addressed.
+3. Push to the PR branch (`git push`).
+4. Capture the new head SHA (`git rev-parse HEAD`).
+
+ABSOLUTE RULES: Do NOT merge the PR (`gh pr merge` / auto-merge are forbidden). Do NOT post a
+comment or re-request review — addressing and pushing is the whole job; a human (or `xiv pr refine`)
+drives the review loop from here.
+
+Report each addressed finding (with its commit) and each skipped finding (with the reason), plus the
+new head SHA.
+
+REQUIRED OUTPUT:
+{props.schema}
+
+Return ONLY raw JSON matching the required output schema.

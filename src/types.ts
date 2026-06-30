@@ -15,6 +15,7 @@ export type StackPosition = number;
 export type WorkflowName =
   | "linear-implement"
   | "pr-review-loop"
+  | "pr-fix"
   | "linear-to-pr"
   | "stack-plan"
   | "stack-build"

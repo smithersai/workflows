@@ -56,7 +56,9 @@ COST
 ONE ISSUE (no stack needed)
   xiv implement <ENG-123>     build it on a branch, local
   xiv ship <ENG-123>          build it + open a PR + drive AI review to approval
-  xiv review --pr <N>         attach to an existing PR and drive review
+  xiv pr refine [<N>]         drive a PR (default: current branch's) to AI approval
+  xiv pr fix [<N>]            address the existing review findings once and push
+  xiv pr review [<N>]         one-off interactive review of a PR (you submit)
 
 IF SOMETHING GOES WRONG
   A failing run is usually transient: re-run "xiv stack build" (it skips finished entries) or

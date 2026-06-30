@@ -59,25 +59,30 @@ Match the user's intent to a row, read that doc, then run the command it points 
 | The user wants to… | Read | Command family |
 |---|---|---|
 | Implement or ship a single Linear issue (e.g. "implement ENG-123", "ship ENG-123") | `references/implement.md` | `xiv implement` / `xiv ship` |
-| Review **someone else's** PR and decide what to submit | `references/review.md` (+ the `xiv-review-core` skill for the actual review judgment) | `xiv pr review` |
-| Drive **my own** PR to approval automatically | `references/review.md` | `xiv review --pr` |
+| Review a PR one-off and decide what to submit | `references/review.md` (+ the `xiv-review-core` skill for the actual review judgment) | `xiv pr review` |
+| Address the findings already on a PR, once | `references/review.md` | `xiv pr fix` |
+| Drive a PR to AI approval (loop) | `references/review.md` | `xiv pr refine` |
 | Build a whole Linear feature as a stack of PRs | `references/stack.md` → then the `stack-plan` and `xiv-operator` skills, and `xiv how-to` | `xiv stack …` |
 | Check on, recover, or cancel a running workflow | `references/smithers-ops.md` | `xiv ps` / `logs` / `ui` / `inspect` / `down` / `cancel` |
 | Author, test, or iterate a workflow itself | `references/authoring.md` | `xiv dev` / `check`, `xiv init` / `update` |
 
-### Disambiguating "review"
+### The `xiv pr` family — pick deliberately
 
-"Review" is overloaded in xiv — pick deliberately:
+"Review" splits into distinct actions; the difference that matters is **whether code gets pushed**.
 
-- **`xiv review --pr N`** — autonomous loop on **your own** PR: triggers the AI reviewers and loops
-  fix→re-request until they approve. Never merges.
-- **`xiv pr review`** — interactive review of **someone else's** PR: an agent reviews it in a
-  worktree, *you* pick the verdict and findings, then submit. Never submits without your say-so.
+- **`xiv pr review [N]`** — *inbound*: review a PR and post comments. An agent reviews it in a
+  worktree, *you* pick the verdict and findings, then submit. Only posts comments, never pushes
+  code, and never submits without your say-so. Best for **someone else's** PR.
+- **`xiv pr fix [N]`** — *outbound, one-shot*: address the findings already on a PR (edits code,
+  commits, **pushes once**), no loop, no re-request. Defaults to the current branch's PR.
+- **`xiv pr refine [N]`** — *outbound, loop*: drive a PR to all-AI-approved — trigger reviewers,
+  fix, re-request, repeat until green. Edits and **pushes** your branch. Defaults to the current
+  branch's PR; `--branch` opens a new PR first. Best for **your own** PR.
 - **the `xiv-review-core` skill** — the code-review *judgment* itself (no CLI): gather context,
-  find the findings, print them. It never posts anything on its own.
+  find the findings, print them. Never posts or pushes anything.
 
-When the user says "review a PR," figure out **whose PR** and **whether they want it submitted** —
-`references/review.md` walks through it.
+When the user says "review a PR," figure out **whose PR**, **whether they want code changed/pushed**,
+and **whether they want it submitted** — `references/review.md` walks through it.
 
 ## When something is off
 

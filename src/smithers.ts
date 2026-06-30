@@ -78,6 +78,14 @@ export function shipInput(command: ShipCommand): Record<string, unknown> {
   return { issueId: command.issueId, base: command.base, tdd: command.tdd };
 }
 
+export interface FixCommand {
+  readonly prNumber: PullRequestNumber;
+}
+
+export function fixInput(command: FixCommand): Record<string, unknown> {
+  return { prNumber: command.prNumber };
+}
+
 export interface StackPlanCommand {
   /** A Linear project ID or parent issue key whose sub-issues become the stack. */
   readonly source: string;

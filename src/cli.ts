@@ -3,12 +3,14 @@ import { resolve } from "node:path";
 import { Args, Command, Options } from "@effect/cli";
 import { BunContext, BunRuntime } from "@effect/platform-bun";
 import { Console, Effect, Option } from "effect";
+import { currentBranchPrNumber } from "./github";
 import { howToGuide } from "./howto";
 import { installPack } from "./manifest";
 import { defaultSmithersHome, packagedPackRoot } from "./paths";
 import { runPrReview } from "./pr-review";
 import {
   checkDevWorkflow,
+  fixInput,
   implementInput,
   parseInput,
   reviewInput,
@@ -45,10 +47,6 @@ const tddFlag = Options.boolean("tdd").pipe(
 const baseOption = Options.text("base").pipe(
   Options.withDescription("Base branch for a newly opened pull request."),
   Options.withDefault("main"),
-);
-const prOption = Options.integer("pr").pipe(
-  Options.withDescription("Existing pull request number to attach to."),
-  Options.optional,
 );
 const branchOption = Options.text("branch").pipe(
   Options.withDescription("Branch to push and open as a new pull request."),
@@ -128,13 +126,12 @@ const autoSubmitOption = Options.boolean("auto-submit").pipe(
   Options.withDescription("Skip the interactive prompts and submit the agent's verdict with all inline-able findings."),
 );
 const prNumberArg = Args.integer({ name: "prNumber" }).pipe(
-  Args.withDescription("PR number to review. Omit to pick from a list of open PRs."),
+  Args.withDescription("PR number. If omitted, `review` picks from a list of open PRs; `fix`/`refine` use the current branch's PR."),
   Args.optional,
 );
 
-function workflowFor(command: "implement" | "review" | "ship"): WorkflowName {
+function workflowFor(command: "implement" | "ship"): WorkflowName {
   if (command === "implement") return "linear-implement";
-  if (command === "review") return "pr-review-loop";
   return "linear-to-pr";
 }
 
@@ -216,25 +213,6 @@ const implement = Command.make(
     }),
 ).pipe(
   Command.withDescription("Implement a Linear issue on a dedicated branch."),
-);
-
-const review = Command.make(
-  "review",
-  { prNumber: prOption, branch: branchOption, base: baseOption },
-  ({ prNumber, branch, base }) => {
-    const resolvedPrNumber = optionValue(prNumber);
-    const resolvedBranch = optionValue(branch);
-    if (resolvedPrNumber !== undefined && resolvedBranch !== undefined) {
-      return Effect.fail(new Error("Use either --pr or --branch, not both."));
-    }
-
-    return runWorkflowCommand({
-      workflow: workflowFor("review"),
-      input: reviewInput({ prNumber: resolvedPrNumber, branch: resolvedBranch, base }),
-    });
-  },
-).pipe(
-  Command.withDescription("Open or attach to a PR, trigger AI review, and loop until reviewers approve."),
 );
 
 const ship = Command.make(
@@ -415,11 +393,71 @@ const prReview = Command.make(
   ),
 );
 
+const prFix = Command.make(
+  "fix",
+  { prNumber: prNumberArg },
+  ({ prNumber }) =>
+    toEffect(async () => {
+      let resolved = optionValue(prNumber);
+      if (resolved === undefined) {
+        const current = await currentBranchPrNumber(process.cwd());
+        if (current === null) {
+          throw new Error("No open PR for the current branch. Pass a PR number: `xiv pr fix <number>`.");
+        }
+        resolved = current;
+      }
+      await runWorkflow({
+        smithersHome: smithersHome(),
+        targetCwd: process.cwd(),
+        workflow: "pr-fix",
+        input: fixInput({ prNumber: resolved }),
+      });
+    }),
+).pipe(
+  Command.withDescription(
+    "Address the existing review findings on a PR once and push — no loop, no re-request. Defaults to the current branch's PR. NEVER merges.",
+  ),
+);
+
+const prRefine = Command.make(
+  "refine",
+  { prNumber: prNumberArg, branch: branchOption, base: baseOption },
+  ({ prNumber, branch, base }) => {
+    const resolvedPrNumber = optionValue(prNumber);
+    const resolvedBranch = optionValue(branch);
+    if (resolvedPrNumber !== undefined && resolvedBranch !== undefined) {
+      return Effect.fail(new Error("Pass either a PR number or --branch, not both."));
+    }
+    return toEffect(async () => {
+      let prNum = resolvedPrNumber;
+      if (prNum === undefined && resolvedBranch === undefined) {
+        const current = await currentBranchPrNumber(process.cwd());
+        if (current === null) {
+          throw new Error("No open PR for the current branch. Pass a PR number, or --branch <name> to open one.");
+        }
+        prNum = current;
+      }
+      await runWorkflow({
+        smithersHome: smithersHome(),
+        targetCwd: process.cwd(),
+        workflow: "pr-review-loop",
+        input: reviewInput({ prNumber: prNum, branch: resolvedBranch, base }),
+      });
+    });
+  },
+).pipe(
+  Command.withDescription(
+    "Drive a PR to all-AI-approved: trigger reviewers, fix findings, re-request, and loop. Defaults to the current branch's PR; --branch opens a new PR first. NEVER merges.",
+  ),
+);
+
 const pr = Command.make("pr", {}, () =>
   Console.log("Run `xiv pr --help` to list PR subcommands."),
 ).pipe(
-  Command.withDescription("Work with pull requests interactively. `xiv pr review` reviews a remote PR locally."),
-  Command.withSubcommands([prReview]),
+  Command.withDescription(
+    "Work with pull requests: `review` (one-off interactive review), `fix` (address findings once), `refine` (loop to AI approval).",
+  ),
+  Command.withSubcommands([prReview, prFix, prRefine]),
 );
 
 const stack = Command.make("stack", {}, () =>
@@ -448,7 +486,6 @@ const root = Command.make("xiv", {}, () =>
     init,
     update,
     implement,
-    review,
     ship,
     pr,
     stack,

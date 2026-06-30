@@ -8,7 +8,7 @@ bun link
 xiv init
 cd /path/to/target-repo
 xiv implement ENG-123
-xiv review --pr 1234
+xiv pr refine 1234
 xiv ship ENG-123
 ```
 

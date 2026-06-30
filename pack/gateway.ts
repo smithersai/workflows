@@ -27,6 +27,7 @@ async function mountWorkflow(key: string): Promise<void> {
 console.log("Workflows:");
 await mountWorkflow("linear-implement");
 await mountWorkflow("pr-review-loop");
+await mountWorkflow("pr-fix");
 await mountWorkflow("linear-to-pr");
 
 await gateway.listen({ host, port });

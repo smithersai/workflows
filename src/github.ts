@@ -44,6 +44,20 @@ export async function detectOwnerRepo(cwd: AbsolutePath): Promise<OwnerRepo | nu
   return value === "" ? null : value;
 }
 
+/** The PR number for the current branch in `cwd`, or null if the branch has no open PR. */
+export async function currentBranchPrNumber(cwd: AbsolutePath): Promise<PullRequestNumber | null> {
+  const result = await runCaptured({
+    cmd: ["gh", "pr", "view", "--json", "number", "-q", ".number"],
+    cwd,
+    env: process.env,
+  });
+  if (result.code !== 0) return null;
+  const value = result.stdout.trim();
+  if (value === "") return null;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) ? parsed : null;
+}
+
 /** The git working-tree root that contains `cwd`, or null if cwd is not inside a git repo. */
 export async function gitToplevel(cwd: AbsolutePath): Promise<AbsolutePath | null> {
   const result = await runCaptured({ cmd: ["git", "rev-parse", "--show-toplevel"], cwd, env: process.env });
