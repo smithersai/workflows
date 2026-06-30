@@ -24,6 +24,31 @@ export function stackMapPath(smithersHome: AbsolutePath, feature: string): Absol
   return join(stacksRoot(smithersHome), `${feature}.json`);
 }
 
+/** Root directory under SMITHERS_HOME for `xiv pr review` state (clones, worktrees, scratch). */
+export function reviewRoot(smithersHome: AbsolutePath): AbsolutePath {
+  return join(smithersHome, "review");
+}
+
+/** Where auto-cloned repos live when `--repo owner/name` is not already a local clone. */
+export function reviewClonesRoot(smithersHome: AbsolutePath): AbsolutePath {
+  return join(reviewRoot(smithersHome), "clones");
+}
+
+/** Where per-PR review worktrees are checked out. */
+export function reviewWorktreesRoot(smithersHome: AbsolutePath): AbsolutePath {
+  return join(reviewRoot(smithersHome), "worktrees");
+}
+
+/** A filesystem-safe slug for an `owner/name` repo, e.g. "phylax-watch__xiv". */
+export function repoSlugForReview(ownerRepo: string): string {
+  return ownerRepo.replace(/[^a-zA-Z0-9._-]+/g, "__");
+}
+
+/** Per-PR scratch directory (findings file, draft review body) for one repo + PR. */
+export function reviewScratchDir(smithersHome: AbsolutePath, ownerRepo: string, prNumber: number): AbsolutePath {
+  return join(reviewRoot(smithersHome), `${repoSlugForReview(ownerRepo)}-pr${prNumber}`);
+}
+
 export function defaultSmithersHome(env: NodeJS.ProcessEnv = process.env): AbsolutePath {
   const configured = env.SMITHERS_HOME;
   if (configured !== undefined && configured.trim() !== "") {

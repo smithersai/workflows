@@ -17,6 +17,7 @@
     "verify": "bun run typecheck && bun test"
   },
   "dependencies": {
+    "@clack/prompts": "^1.6.0",
     "@effect/cli": "0.75.2",
     "@effect/platform": "0.96.1",
     "@effect/platform-bun": "0.90.0",

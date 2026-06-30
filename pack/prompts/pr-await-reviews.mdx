@@ -30,6 +30,7 @@ checks `claude` + `codex`; **adapt the per-reviewer checks to the actual expecte
 reviewers**, and for a human reviewer count any review/comment after `$SINCE`.
 
 ```bash
+set -o pipefail                        # a broken jq/gh stage must NOT pass silently
 PR=0                                   # <-- set to this PR's number (stated above)
 OR=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
 HEAD=$(gh pr view "$PR" --json headRefOid --jq .headRefOid)            # current pushed head
@@ -39,13 +40,24 @@ echo "waiting for reviews on #$PR since $SINCE (head $HEAD)"
 n=0
 while :; do
   n=$((n+1))
-  # --paginate + jq -s so we see the NEWEST comments, not just the oldest page
-  ic=$(gh api --paginate "repos/$OR/issues/$PR/comments" --jq '.[]' | jq -s '.')
-  rv=$(gh api --paginate "repos/$OR/pulls/$PR/reviews"   --jq '.[]' | jq -s '.')
+  # --slurp returns ONE valid JSON array across all pages. Do NOT pipe through a
+  # second jq or `echo "$var" | jq`: gh --jq '.[]' + a re-parse, and echo's escape
+  # expansion (zsh/dash/`xpg_echo`), both turn control chars in comment bodies into
+  # raw bytes and break the next jq with "control characters ... must be escaped".
+  # Always read these vars with a `<<<` here-string, never `echo "$var" |`.
+  ic=$(gh api --paginate --slurp "repos/$OR/issues/$PR/comments")
+  rv=$(gh api --paginate --slurp "repos/$OR/pulls/$PR/reviews")
   # claude[bot]: an issue-comment edited after SINCE with a real (non-placeholder) body
-  claude=$(echo "$ic" | jq --arg s "$SINCE" '[.[]|select(.user.login=="claude[bot]" and .updated_at>$s and (.body|length>40) and ((.body|ascii_downcase)|test("working|reviewing|take a look|on it")|not))]|length')
-  # codex: a formal review OR comment after SINCE with a real body
+  claude=$(jq --arg s "$SINCE" '[.[]|select(.user.login=="claude[bot]" and .updated_at>$s and (.body|length>40) and ((.body|ascii_downcase)|test("working|reviewing|take a look|on it")|not))]|length' <<<"$ic")
+  # codex: a formal review OR comment after SINCE with a real body (printf %s does NOT
+  # mangle escapes, so this two-array slurp is safe; ic/rv are already valid arrays)
   codex=$(printf '%s\n%s\n' "$rv" "$ic" | jq -s --arg s "$SINCE" 'add|[.[]|select((.user.login|test("codex")) and ((.submitted_at//.updated_at)>$s) and ((.body//"")|length>20))]|length')
+  # FAIL LOUD to the driving agent: a non-numeric count means the detector itself
+  # broke (jq/gh error) — never let that masquerade as "0 reviews" and spin to TIMEOUT.
+  if ! [[ "$claude" =~ ^[0-9]+$ ]] || ! [[ "$codex" =~ ^[0-9]+$ ]]; then
+    echo "DETECTOR_ERROR claude=[$claude] codex=[$codex] — review counts are non-numeric; gh/jq failed. Aborting the poll loop. AGENT: do NOT treat this as 'no reviews' — skip straight to the final fetch below and classify from that." >&2
+    exit 3
+  fi
   echo "[attempt $n/$MAX] claude=$claude codex=$codex"
   test "$claude" -ge 1 && test "$codex" -ge 1 && echo DONE && break
   test "$n" -ge "$MAX" && echo TIMEOUT && break
@@ -54,18 +66,24 @@ done
 ```
 
 Run that in the FOREGROUND in one shot — it IS the wait, and each `[attempt …]`
-line is your heartbeat. After it prints `DONE` or `TIMEOUT`, do a final fetch of
-all reviews + issue comments + inline review comments and classify per the
-sections below:
+line is your heartbeat. The loop is ONLY a timer: its counts decide when to STOP
+waiting, never how to classify. After it prints `DONE`/`TIMEOUT` — or aborts with
+`DETECTOR_ERROR` (exit 3) — do a final fetch of all reviews + issue comments +
+inline review comments and classify per the sections below **from that fetch, not
+from the loop's counts**:
 
 - `gh pr view $PR --json reviews,latestReviews,reviewDecision,comments`
 - inline review comments: `gh api repos/$OR/pulls/$PR/comments`
 - issue comments: `gh api repos/$OR/issues/$PR/comments`
 
-If the loop exited `TIMEOUT` with one or more reviewers still lacking a
-substantive response, set `timedOut: true` and mark those reviewers `pending`.
-For each comment, note `user.login`, `body`, `created_at`, `updated_at`, and the
-comment `id` — you need these to tell a finished review from a placeholder.
+A reviewer is `pending` ONLY if this final fetch shows no substantive response
+from them after `$SINCE`. If the fetch shows real findings or an approval, classify
+`findings`/`approved` accordingly **even if the loop printed `TIMEOUT` or a low
+count** — a timed-out wait must never downgrade a real, substantive review to
+`pending`. Set `timedOut: true` only when the loop genuinely ran out of attempts
+with a reviewer still silent. For each comment, note `user.login`, `body`,
+`created_at`, `updated_at`, and the comment `id` — you need these to tell a
+finished review from a placeholder.
 
 ## Detecting in-progress reviews (IMPORTANT — claude[bot] edits in place)
 

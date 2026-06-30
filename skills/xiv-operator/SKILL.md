@@ -1,6 +1,6 @@
 ---
 name: xiv-operator
-description: Operate and babysit xiv stacked-PR runs. Start, monitor, and safely resume `xiv stack` build/push/amend runs; read `xiv stack triage` to classify state; auto-resume transient failures (crashes, stale runs, brief rate limits) and STOP + escalate the rest (auth expiry, jj conflicts, repeated test failures, anything unrecognized). Use when running or supervising a long or overnight `xiv stack` feature build and you want a low-cost agent to keep it alive and flag problems to a human.
+description: Babysit a long-running `xiv stack` stacked-PR build. Polls `xiv stack triage` to classify run state, auto-resumes transient failures (crashes, stale runs, brief rate limits), and STOPs + escalates everything else (auth expiry, jj conflicts, repeated test failures, anything unrecognized). Use when supervising a long or overnight `xiv stack` feature build and you want a cheap agent to keep it alive and flag real problems to a human.
 metadata:
   internal: false
 allowed-tools:

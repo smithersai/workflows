@@ -88,7 +88,10 @@ export default smithers((ctx) => {
     .flatMap((reviewer) => reviewer.findings.map((finding) => ({ reviewer: reviewer.name, path: finding.path, body: finding.body })));
   const hasOpenFindings = openFindings.length > 0;
   const done = latestReview?.allResolved === true;
-  const skipFix = latestReview === undefined || latestReview.allResolved || latestReview.timedOut || !hasOpenFindings;
+  // A timed-out poll must NOT discard real findings: fix whenever there are open
+  // findings, regardless of timedOut. Skip only when there is genuinely nothing to fix
+  // (no review yet, everything resolved, or no open findings — e.g. reviewers still pending).
+  const skipFix = latestReview === undefined || latestReview.allResolved || !hasOpenFindings;
   const addressed = latestFix?.addressed ?? [];
   const skipped = latestFix?.skipped ?? [];
 

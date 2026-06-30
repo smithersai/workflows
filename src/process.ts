@@ -50,3 +50,13 @@ export async function runCaptured(options: SpawnOptions): Promise<ProcessResult>
   ]);
   return { code, stdout, stderr };
 }
+
+/** Run a command and return its trimmed stdout, throwing with stderr context on a non-zero exit. */
+export async function capture(options: SpawnOptions): Promise<string> {
+  const result = await runCaptured(options);
+  if (result.code !== 0) {
+    const detail = result.stderr.trim() !== "" ? result.stderr.trim() : result.stdout.trim();
+    throw new Error(`${options.cmd.join(" ")} exited with ${result.code}: ${detail}`);
+  }
+  return result.stdout.trim();
+}

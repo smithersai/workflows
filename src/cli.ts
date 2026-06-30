@@ -1,10 +1,12 @@
 #!/usr/bin/env bun
+import { resolve } from "node:path";
 import { Args, Command, Options } from "@effect/cli";
 import { BunContext, BunRuntime } from "@effect/platform-bun";
 import { Console, Effect, Option } from "effect";
 import { howToGuide } from "./howto";
 import { installPack } from "./manifest";
 import { defaultSmithersHome, packagedPackRoot } from "./paths";
+import { runPrReview } from "./pr-review";
 import {
   checkDevWorkflow,
   implementInput,
@@ -110,6 +112,24 @@ const repoKeyOption = Options.text("repo").pipe(
 );
 const allReposOption = Options.boolean("all-repos").pipe(
   Options.withDescription("Fan out across every repo in the stack, one pinned run per repo, in parallel."),
+);
+const prReviewRepoOption = Options.text("repo").pipe(
+  Options.withDescription("Target repo as owner/name. Defaults to the current directory's repo; auto-cloned if not present locally."),
+  Options.optional,
+);
+const promptFileOption = Options.text("prompt-file").pipe(
+  Options.withDescription("Path to a custom review-prompt template (Markdown). Defaults to the packaged local-review prompt."),
+  Options.optional,
+);
+const keepWorktreeOption = Options.boolean("keep").pipe(
+  Options.withDescription("Keep the review worktree after submitting (default: remove it)."),
+);
+const autoSubmitOption = Options.boolean("auto-submit").pipe(
+  Options.withDescription("Skip the interactive prompts and submit the agent's verdict with all inline-able findings."),
+);
+const prNumberArg = Args.integer({ name: "prNumber" }).pipe(
+  Args.withDescription("PR number to review. Omit to pick from a list of open PRs."),
+  Args.optional,
 );
 
 function workflowFor(command: "implement" | "review" | "ship"): WorkflowName {
@@ -368,6 +388,40 @@ const stackAmend = Command.make(
   Command.withDescription("Apply a change to a stack entry and re-flow it through its repo's descendants. --target <issue> or --repo <key> for multi-repo."),
 );
 
+const prReview = Command.make(
+  "review",
+  {
+    prNumber: prNumberArg,
+    repo: prReviewRepoOption,
+    promptFile: promptFileOption,
+    keep: keepWorktreeOption,
+    autoSubmit: autoSubmitOption,
+  },
+  ({ prNumber, repo, promptFile, keep, autoSubmit }) => {
+    const promptFilePath = optionValue(promptFile);
+    return toEffect(() =>
+      runPrReview({
+        prNumber: optionValue(prNumber),
+        repo: optionValue(repo),
+        promptFile: promptFilePath === undefined ? undefined : resolve(process.cwd(), promptFilePath),
+        keep,
+        autoSubmit,
+      }),
+    );
+  },
+).pipe(
+  Command.withDescription(
+    "Review a remote PR locally: pick an open PR, run an agent in an isolated worktree, then interactively select findings and submit the review (approve/request-changes/comment). NEVER merges.",
+  ),
+);
+
+const pr = Command.make("pr", {}, () =>
+  Console.log("Run `xiv pr --help` to list PR subcommands."),
+).pipe(
+  Command.withDescription("Work with pull requests interactively. `xiv pr review` reviews a remote PR locally."),
+  Command.withSubcommands([prReview]),
+);
+
 const stack = Command.make("stack", {}, () =>
   Console.log("Run `xiv stack --help` to list stack subcommands."),
 ).pipe(
@@ -396,6 +450,7 @@ const root = Command.make("xiv", {}, () =>
     implement,
     review,
     ship,
+    pr,
     stack,
     dev,
     check,

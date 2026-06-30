@@ -23,6 +23,82 @@ export type WorkflowName =
   | "stack-review";
 export type SmithersPassthroughCommand = "ps" | "logs" | "ui" | "inspect" | "down" | "cancel";
 
+/** A GitHub repository identifier in `owner/name` form, e.g. "phylax-watch/xiv". */
+export type OwnerRepo = string;
+/** A GitHub login (user or bot), e.g. "alice" or "claude[bot]". */
+export type GithubLogin = string;
+
+/** The `event` field of a GitHub pull-request review submission. */
+export type ReviewEvent = "APPROVE" | "REQUEST_CHANGES" | "COMMENT";
+/** The `side` of a diff a review comment anchors to. Local review only ever posts on the new side. */
+export type DiffSide = "LEFT" | "RIGHT";
+
+/** One open/draft PR as returned by `gh pr list --json`. */
+export interface PullRequestSummary {
+  readonly number: PullRequestNumber;
+  readonly title: string;
+  readonly author: GithubLogin;
+  readonly isDraft: boolean;
+  readonly headRefName: BranchName;
+  readonly headRefOid: GitSha;
+  readonly additions: number;
+  readonly deletions: number;
+}
+
+/** Detail for a single PR needed to review it, from `gh pr view --json`. */
+export interface PullRequestDetail {
+  readonly number: PullRequestNumber;
+  readonly title: string;
+  readonly author: GithubLogin;
+  readonly body: string;
+  readonly baseRefName: BranchName;
+  readonly headRefName: BranchName;
+  readonly headRefOid: GitSha;
+}
+
+/** Commentable lines per repo-relative file path (the RIGHT-side lines present in the PR diff). */
+export type DiffLineMap = ReadonlyMap<RelativePath, ReadonlySet<number>>;
+
+/** One inline comment in a GitHub review-creation payload. */
+export interface ReviewComment {
+  readonly path: RelativePath;
+  readonly line: number;
+  readonly side: DiffSide;
+  readonly start_line?: number;
+}
+
+/** The body posted to `POST /repos/{owner}/{name}/pulls/{n}/reviews`. */
+export interface ReviewSubmission {
+  readonly event: ReviewEvent;
+  readonly body: string;
+  readonly comments: readonly (ReviewComment & { readonly body: string })[];
+}
+
+/** Where the cwd resolved to: a local clone root plus the repo it points at. */
+export interface ResolvedClone {
+  readonly ownerRepo: OwnerRepo;
+  readonly cloneRoot: AbsolutePath;
+  /** True when this clone was created by the auto-clone fallback (under the review cache). */
+  readonly cloned: boolean;
+}
+
+/** A checked-out worktree for one PR head. */
+export interface PrWorktree {
+  readonly path: AbsolutePath;
+  readonly headSha: GitSha;
+  /** The git ref to diff the PR head against, e.g. "origin/main" (already fetched into the clone). */
+  readonly baseRef: string;
+}
+
+/** Parsed options for `xiv pr review`. */
+export interface PrReviewOptions {
+  readonly prNumber?: PullRequestNumber;
+  readonly repo?: OwnerRepo;
+  readonly promptFile?: AbsolutePath;
+  readonly keep: boolean;
+  readonly autoSubmit: boolean;
+}
+
 /** Lifecycle of a single entry (issue/branch) within a stack, bottom to top. */
 export type StackStatus =
   | "pending"

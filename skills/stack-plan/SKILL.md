@@ -1,6 +1,6 @@
 ---
 name: stack-plan
-description: Plan a stacked-PR feature across one or more repos before building it. Fetch the Linear issues for a project or parent issue, order them into per-repo substacks, auto-assign the obvious ones to a repo, and CONFIRM the unclear and non-code ones with the human (recommending exclusion for things like "set GCP secrets"). Then write a resolved plan and persist it with `xiv stack plan --plan`. Use when starting an `xiv stack` feature — especially multi-repo (microservices) — so issue→repo assignment is correct and nothing non-buildable sneaks into the stack.
+description: Plan a stacked-PR feature across one or more repos before building. Fetches the Linear issues for a project or parent issue, orders them into per-repo substacks, auto-assigns the obvious ones, and CONFIRMS the unclear and non-code ones with the human (recommending exclusion for items like "set GCP secrets"), then persists the resolved plan with `xiv stack plan --plan`. Use when starting an `xiv stack` feature — especially multi-repo/microservices — so issue→repo assignment is right and nothing non-buildable sneaks into the stack.
 metadata:
   internal: false
 ---
