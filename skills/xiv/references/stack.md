@@ -8,6 +8,27 @@ needs editing it re-flows up through every descendant (via **jj**, run colocated
 This doc is intentionally thin: the stack lifecycle has two dedicated skills and a live runbook
 that are the real source of truth. Your job is to route to them.
 
+## How jj fits in (read with git, edit with jj)
+
+The stacking and re-flow are powered by **jj (Jujutsu)**, run **colocated** with git — `.jj/` lives
+next to `.git/`, and deleting it reverts to plain git. GitHub, CI, and reviewers only ever see a
+normal git repo with normal branches and PRs. You don't need to drive jj by hand; `xiv stack`
+commands do. What you DO need is the one rule that keeps the stack coherent:
+
+- **Read with git.** `git checkout pr-17`, `git diff`, `git log`, reviewing in your usual tools —
+  all fine and encouraged.
+- **Edit / restack only through `xiv stack` (or jj).** Applying a change to an entry is
+  `xiv stack amend`; jj then re-flows it up through every descendant automatically.
+- **Never hand-edit a pushed stacked branch with git** — no `git rebase`, `git commit --amend`, or
+  `git push --force` on a stack branch. That bypasses jj's cascade and desyncs the stack map from
+  the actual branches, which is exactly the kind of breakage that's painful to unwind.
+
+If jj reports a **rebase/restack conflict** during a build or amend, that's a STOP-and-escalate
+situation — don't resolve it blindly. The `xiv-operator` skill owns the conflict playbook.
+
+Setup is one-time per repo: `xiv stack init` (`jj git init --colocate`; reversible). Requires `jj`
+on PATH (`brew install jj`). For the deeper model, see the repo `README.md` and `xiv how-to`.
+
 ## The lifecycle (and who owns each part)
 
 1. **Plan** — order the issues, assign each to a repo, exclude non-code work. → **use the
@@ -32,8 +53,7 @@ Multi-repo features fan out with `--all-repos` / `--repo <key>`; each repo gets 
 - **Full runbook:** run `xiv how-to` — it prints the authoritative, current orchestration guide
   (the triage-driven loop and the action→command mapping). Prefer it over anything memorized here.
 - **Current flags:** `xiv stack <subcommand> -h`.
-- **One-time setup per repo:** `xiv stack init` (switches on jj colocated; reversible). Requires
-  `jj` on PATH.
+- **Setup:** `xiv stack init` once per repo (see "How jj fits in" above).
 
 ## Guardrails
 

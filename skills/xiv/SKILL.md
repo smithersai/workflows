@@ -19,6 +19,12 @@ agent** — you rarely run it for a human at a terminal; you launch its workflow
 them alive, and flag real trouble to the human. Think of yourself as the orchestrator of *other*
 agent workflows.
 
+**How it fits together:** **Smithers** is the engine that actually runs these long, multi-agent
+workflows; `xiv` is the thin wrapper that launches and manages them. A command acts on the repo you
+invoke it from, and run state (logs, executions, stack maps) lives under `SMITHERS_HOME` —
+`~/.smithers` by default. The work itself is Linear-issue-driven and lands as normal GitHub branches
+and PRs. After the pack changes, `xiv update` reinstalls the managed workflows into `SMITHERS_HOME`.
+
 This skill is a **router**. Figure out what the user is trying to do, open the reference doc that
 matches that **intent**, and follow it. Don't read every doc up front. Most tasks need exactly one;
 some span two areas (e.g. "is my stack build stuck?" is *observe* + *stack*) — in that case start
