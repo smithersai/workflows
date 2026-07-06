@@ -16,6 +16,8 @@ const inputSchema = z.object({
   issueId: z.string().default(""),
   base: z.string().default("main"),
   tdd: z.boolean().default(false),
+  // Forwarded to linear-implement: skip its acceptance-review step (validation still gates).
+  skipAcceptanceReview: z.boolean().default(false),
 });
 
 const prResultSchema = z.looseObject({
@@ -44,7 +46,11 @@ export default smithers((ctx) => {
         <SubflowLoose
           id="impl"
           workflow={linearImplement}
-          input={{ issueId: ctx.input.issueId, tdd: ctx.input.tdd }}
+          input={{
+            issueId: ctx.input.issueId,
+            tdd: ctx.input.tdd,
+            skipAcceptanceReview: ctx.input.skipAcceptanceReview,
+          }}
           output={outputs.implResult}
         />
         <SubflowLoose

@@ -20,6 +20,8 @@ import { runInherited } from "./process";
 export interface ImplementCommand {
   readonly issueId: IssueId;
   readonly tdd: boolean;
+  /** Skip the local acceptance-review step; validation (tests/lint/typecheck) still gates the loop. */
+  readonly skipAcceptanceReview: boolean;
 }
 
 export interface ReviewCommand {
@@ -32,6 +34,8 @@ export interface ShipCommand {
   readonly issueId: IssueId;
   readonly base: BaseBranchName;
   readonly tdd: boolean;
+  /** Skip the local acceptance-review step; validation (tests/lint/typecheck) still gates the loop. */
+  readonly skipAcceptanceReview: boolean;
 }
 
 export function smithersBin(root: AbsolutePath): AbsolutePath {
@@ -64,7 +68,7 @@ function ensurePackInstalled(packRoot: AbsolutePath): void {
 }
 
 export function implementInput(command: ImplementCommand): Record<string, unknown> {
-  return { issueId: command.issueId, tdd: command.tdd };
+  return { issueId: command.issueId, tdd: command.tdd, skipAcceptanceReview: command.skipAcceptanceReview };
 }
 
 export function reviewInput(command: ReviewCommand): Record<string, unknown> {
@@ -75,7 +79,12 @@ export function reviewInput(command: ReviewCommand): Record<string, unknown> {
 }
 
 export function shipInput(command: ShipCommand): Record<string, unknown> {
-  return { issueId: command.issueId, base: command.base, tdd: command.tdd };
+  return {
+    issueId: command.issueId,
+    base: command.base,
+    tdd: command.tdd,
+    skipAcceptanceReview: command.skipAcceptanceReview,
+  };
 }
 
 export interface FixCommand {
@@ -94,6 +103,8 @@ export interface StackPlanCommand {
   /** The repo(s) this feature may span, keyed by RepoKey. A single-repo feature has one entry. */
   readonly repos: Record<RepoKey, RepoConfig>;
   readonly stackMapPath: AbsolutePath;
+  /** Record in the map that every build of this feature should skip the local acceptance-review step. */
+  readonly skipAcceptanceReview: boolean;
 }
 
 export function stackPlanInput(command: StackPlanCommand): Record<string, unknown> {
@@ -103,6 +114,7 @@ export function stackPlanInput(command: StackPlanCommand): Record<string, unknow
     repoSlug: command.repoSlug,
     repos: command.repos,
     stackMapPath: command.stackMapPath,
+    skipAcceptanceReview: command.skipAcceptanceReview,
   };
 }
 
@@ -110,10 +122,15 @@ export interface StackBuildCommand {
   readonly stackMapPath: AbsolutePath;
   /** Build only this repo's substack. Omit for a single-repo stack. */
   readonly repo?: RepoKey;
+  /** Per-run override: skip the local acceptance-review step. ORs with the map's feature-level default. */
+  readonly skipAcceptanceReview: boolean;
 }
 
 export function stackBuildInput(command: StackBuildCommand): Record<string, unknown> {
-  const input: Record<string, unknown> = { stackMapPath: command.stackMapPath };
+  const input: Record<string, unknown> = {
+    stackMapPath: command.stackMapPath,
+    skipAcceptanceReview: command.skipAcceptanceReview,
+  };
   if (command.repo !== undefined) input.repo = command.repo;
   return input;
 }

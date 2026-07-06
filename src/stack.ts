@@ -318,7 +318,11 @@ function resolveSingleRepo(map: StackMap, repo: RepoKey | undefined): RepoKey {
 
 export async function runStackPlan(
   context: StackCommandContext,
-  options: { readonly source: string; readonly repos: Record<RepoKey, RepoConfig> },
+  options: {
+    readonly source: string;
+    readonly repos: Record<RepoKey, RepoConfig>;
+    readonly skipAcceptanceReview: boolean;
+  },
 ): Promise<void> {
   // No jj preflight here: planning only reads Linear and writes the map. jj is required per-repo
   // at build/amend/push time (checked there), so `plan` runs from anywhere.
@@ -333,6 +337,7 @@ export async function runStackPlan(
       repoSlug: repoSlugFor(context.targetCwd),
       repos: options.repos,
       stackMapPath: path,
+      skipAcceptanceReview: options.skipAcceptanceReview,
     }),
   });
 }
@@ -343,7 +348,11 @@ export async function runStackPlan(
  */
 export async function runStackPlanFromFile(
   context: StackCommandContext,
-  options: { readonly planPath: AbsolutePath; readonly repos: Record<RepoKey, RepoConfig> },
+  options: {
+    readonly planPath: AbsolutePath;
+    readonly repos: Record<RepoKey, RepoConfig>;
+    readonly skipAcceptanceReview: boolean;
+  },
 ): Promise<void> {
   let raw: string;
   try {
@@ -366,6 +375,7 @@ export async function runStackPlanFromFile(
     feature: context.feature,
     repoSlug: repoSlugFor(context.targetCwd),
     repos: options.repos,
+    skipAcceptanceReview: options.skipAcceptanceReview,
     source: {
       linearProjectId: plan.source?.linearProjectId,
       parentIssueId: plan.source?.parentIssueId,
@@ -384,7 +394,12 @@ export async function runStackPlanFromFile(
 
 export async function runStackBuild(
   context: StackCommandContext,
-  options: { readonly repo?: RepoKey; readonly allRepos: boolean; readonly detach: boolean },
+  options: {
+    readonly repo?: RepoKey;
+    readonly allRepos: boolean;
+    readonly detach: boolean;
+    readonly skipAcceptanceReview: boolean;
+  },
 ): Promise<void> {
   const { path, map } = await requireStackMap(context);
   const targets = options.allRepos ? repoKeys(map) : [resolveSingleRepo(map, options.repo)];
@@ -396,7 +411,7 @@ export async function runStackBuild(
       smithersHome: context.smithersHome,
       targetCwd: config.path,
       workflow: "stack-build",
-      input: stackBuildInput({ stackMapPath: path, repo }),
+      input: stackBuildInput({ stackMapPath: path, repo, skipAcceptanceReview: options.skipAcceptanceReview }),
       detach: options.allRepos ? true : options.detach,
     });
   }

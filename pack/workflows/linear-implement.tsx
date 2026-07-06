@@ -25,6 +25,10 @@ const planOutputSchema = z.object({
 const inputSchema = z.object({
   issueId: z.string().default(""),
   tdd: z.boolean().default(false),
+  // Skip the acceptance-review step entirely. The loop's done-gate already treats
+  // "no valid reviews" as "gate on validation alone" (see the `done` computation),
+  // so skipping cannot wedge the loop — validation still decides.
+  skipAcceptanceReview: z.boolean().default(false),
 });
 
 const { Workflow, Task, Sequence, smithers } = createSmithers({
@@ -134,7 +138,13 @@ export default smithers((ctx) => {
             <Task id="impl:validate" output={validateOutputSchema} agent={linearImplementAgents.validate} timeoutMs={1_800_000} heartbeatTimeoutMs={600_000}>
               <ValidatePrompt prompt={implementPrompt} />
             </Task>
-            <Task id="impl:review" output={reviewOutputSchema} agent={linearImplementAgents.review} continueOnFail>
+            <Task
+              id="impl:review"
+              output={reviewOutputSchema}
+              agent={linearImplementAgents.review}
+              continueOnFail
+              skipIf={ctx.input.skipAcceptanceReview}
+            >
               <AcceptanceReviewPrompt reviewer="reviewer-1" prompt={implementPrompt} />
             </Task>
           </Sequence>

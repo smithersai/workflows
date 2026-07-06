@@ -22,9 +22,11 @@ COMMANDS (run orchestration commands from your "home" repo; init/build operate p
   xiv stack init                                       one-time per repo: colocate jj
   xiv stack plan <project|ENG-400> --feature <slug>    build the ordered stack map from Linear
        [--repo key=path]...                            multi-repo: assign issues across repos (repeatable)
+       [--skip-acceptance-review]                      record feature-wide default: build without the local review step
   xiv stack status  --feature <slug>                   human-readable map (grouped by repo)
   xiv stack triage  --feature <slug> [--json]          what-to-do-next oracle (start here)
   xiv stack build   --feature <slug> [--all-repos|--repo <key>] [--detach]   build entries locally; resumable
+       [--skip-acceptance-review]                      this run only; ORs with the map default (validation still gates)
   xiv stack preview --feature <slug>                   checkout every repo at its tip = preview the feature
   xiv stack push    --feature <slug> --count <N> [--all-repos|--repo <key>]  open lowest N as stacked PRs
   xiv stack amend   --feature <slug> -m "<change>" [--target <issue|branch>]
@@ -52,6 +54,8 @@ COST
   Agents default to a cheap tier (Sonnet for work, Haiku for validate, low codex reasoning) —
   fine for fully-spec'd Linear work. For a hard feature, prefix the command with
   XIV_TIER=quality (leads with Opus). A hard cap is available via XIV_AGENT_MAX_USD.
+  For fully-spec'd stacks, --skip-acceptance-review (plan-time default or per build run) drops
+  the local review step; validation still gates, and GitHub AI reviewers still run at push time.
 
 ONE ISSUE (no stack needed)
   xiv implement <ENG-123>     build it on a branch, local

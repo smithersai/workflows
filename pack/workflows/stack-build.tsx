@@ -25,6 +25,9 @@ import linearImplement from "./linear-implement";
 const inputSchema = z.object({
   stackMapPath: z.string().default(""),
   repo: z.string().default(""),
+  // Per-run override from the CLI. ORs with the map's plan-time default below —
+  // a flag can force skipping on, but never re-enables review on a map that opted out.
+  skipAcceptanceReview: z.boolean().default(false),
 });
 
 const ackSchema = z.object({
@@ -71,6 +74,7 @@ export default smithers((ctx) => {
 
   const repo = ctx.input.repo;
   const entries = repo === "" ? entriesInOrder(map) : entriesForRepo(map, repo);
+  const skipAcceptanceReview = ctx.input.skipAcceptanceReview || map.skipAcceptanceReview === true;
 
   return (
     <Workflow name="stack-build">
@@ -90,7 +94,7 @@ export default smithers((ctx) => {
               <SubflowLoose
                 id={`build:impl:${entry.issueId}`}
                 workflow={linearImplement}
-                input={{ issueId: entry.issueId }}
+                input={{ issueId: entry.issueId, skipAcceptanceReview }}
                 output={outputs.impl}
                 skipIf={done}
               />

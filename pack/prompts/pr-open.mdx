@@ -15,7 +15,7 @@ Steps (use `git` and `gh` directly):
    - **Body**:
 {props.body}
 
-     Append a trailer line: `🤖 Generated with Claude Code (Smithers pr-review-loop)`.
+     Append a trailer line: `🤖 Generated with Claude Code`.
 3. Immediately post a review-trigger comment on the new PR with `gh pr comment`.
    The comment body MUST be exactly (interpolated handles, do not alter):
    {props.reviewersMention} review
@@ -25,6 +25,10 @@ Then capture the PR number, URL, and current head SHA
 
 ABSOLUTE RULE: Do NOT merge the PR. Never run `gh pr merge`, never enable
 auto-merge. Creating and commenting only.
+
+ANONYMITY: Never name the tooling behind this work in the PR title, body, review-trigger
+comment, or anywhere else others will see it — no `xiv`, no `smithers`, no internal workflow or
+command names. It's a private internal tool; the PR must read as ordinary human-authored work.
 
 REQUIRED OUTPUT:
 {props.schema}

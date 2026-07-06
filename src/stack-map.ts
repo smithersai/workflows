@@ -79,6 +79,7 @@ const stackMapSchema = z.object({
   repos: z.record(z.string(), repoConfigSchema).default({}),
   tips: z.record(z.string(), z.string()).default({}),
   engine: stackEngineSchema.default("jj"),
+  skipAcceptanceReview: z.boolean().optional(),
   source: stackFeatureSourceSchema,
   entries: z.array(stackEntrySchema).default([]),
   createdAt: z.string(),
@@ -185,6 +186,8 @@ export interface CreateStackMapOptions {
   readonly feature: FeatureName;
   readonly repoSlug: RepoSlug;
   readonly repos: Record<RepoKey, RepoConfig>;
+  /** Record "build without the local acceptance-review step" as the feature-level default. */
+  readonly skipAcceptanceReview?: boolean;
   readonly source: StackMap["source"];
   readonly entries: readonly StackEntry[];
 }
@@ -198,6 +201,8 @@ export function createStackMap(options: CreateStackMapOptions, now: Date = new D
     repos: options.repos,
     tips: {},
     engine: "jj",
+    // Only materialize the key when set, so existing maps round-trip byte-identically.
+    ...(options.skipAcceptanceReview === true ? { skipAcceptanceReview: true } : {}),
     source: options.source,
     entries: sortByPosition(options.entries),
     createdAt: iso,

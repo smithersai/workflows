@@ -196,6 +196,12 @@ export interface StackMap {
   /** Per-repo tip branch — checking out repos[k].path at tips[k] previews that repo's whole substack. */
   readonly tips: Record<RepoKey, BranchName>;
   readonly engine: StackEngine;
+  /**
+   * Feature-level default recorded at plan time: build every entry without the
+   * local acceptance-review step (validation still gates). Per-run CLI flags OR
+   * with this — they can force skipping on, never back off a map that set it.
+   */
+  readonly skipAcceptanceReview?: boolean;
   readonly source: StackFeatureSource;
   readonly entries: readonly StackEntry[];
   readonly createdAt: IsoTimestamp;

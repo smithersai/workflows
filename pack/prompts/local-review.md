@@ -65,3 +65,8 @@ The JSON MUST match this schema (no prose, no code fences inside the file — ju
 
 After writing the file, stop. Do not push, comment on the PR, or modify any tracked file in the
 worktree — your only side effect is writing the findings file above.
+
+ANONYMITY: your finding titles and bodies may be posted verbatim as PR review comments — never
+name the tooling behind this review in them (no `xiv`, no `smithers`, no internal workflow or
+command names). It's a private internal tool; findings must read as ordinary human-authored review
+feedback.

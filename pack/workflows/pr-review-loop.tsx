@@ -33,7 +33,7 @@ const inputSchema = z.object({
   base: z.string().default("main"),
   issueContext: issueContextSchema.optional(),
   reviewers: z.array(z.string()).default(["claude", "codex"]),
-  maxRounds: z.number().int().default(8),
+  maxRounds: z.number().int().default(4),
   pollIntervalSec: z.number().int().default(60),
   maxAttempts: z.number().int().default(30),
 });
@@ -57,7 +57,7 @@ const { Workflow, Task, Sequence, smithers } = createSmithers({
 export default smithers((ctx) => {
   const base = ctx.input.base || "main";
   const reviewers = ctx.input.reviewers ?? ["claude", "codex"];
-  const maxRounds = ctx.input.maxRounds ?? 8;
+  const maxRounds = ctx.input.maxRounds ?? 4;
   const pollIntervalSec = ctx.input.pollIntervalSec ?? 60;
   const maxAttempts = ctx.input.maxAttempts ?? 20;
   const branch = ctx.input.branch || "(current branch)";

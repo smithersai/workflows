@@ -14,9 +14,15 @@ import {
 
 describe("workflow input builders", () => {
   test("builds implement input", () => {
-    expect(implementInput({ issueId: "ENG-123", tdd: true })).toEqual({
+    expect(implementInput({ issueId: "ENG-123", tdd: true, skipAcceptanceReview: false })).toEqual({
       issueId: "ENG-123",
       tdd: true,
+      skipAcceptanceReview: false,
+    });
+    expect(implementInput({ issueId: "ENG-123", tdd: false, skipAcceptanceReview: true })).toEqual({
+      issueId: "ENG-123",
+      tdd: false,
+      skipAcceptanceReview: true,
     });
   });
 
@@ -35,10 +41,11 @@ describe("workflow input builders", () => {
   });
 
   test("builds ship input", () => {
-    expect(shipInput({ issueId: "ENG-123", base: "main", tdd: false })).toEqual({
+    expect(shipInput({ issueId: "ENG-123", base: "main", tdd: false, skipAcceptanceReview: true })).toEqual({
       issueId: "ENG-123",
       base: "main",
       tdd: false,
+      skipAcceptanceReview: true,
     });
   });
 
@@ -51,6 +58,7 @@ describe("workflow input builders", () => {
         repoSlug: "app-abc12345",
         repos,
         stackMapPath: "/home/.smithers/stacks/app/checkout.json",
+        skipAcceptanceReview: true,
       }),
     ).toEqual({
       source: "PROJ-1",
@@ -58,14 +66,19 @@ describe("workflow input builders", () => {
       repoSlug: "app-abc12345",
       repos,
       stackMapPath: "/home/.smithers/stacks/app/checkout.json",
+      skipAcceptanceReview: true,
     });
   });
 
   test("builds stack build input, with and without a repo scope", () => {
-    expect(stackBuildInput({ stackMapPath: "/p/checkout.json" })).toEqual({ stackMapPath: "/p/checkout.json" });
-    expect(stackBuildInput({ stackMapPath: "/p/checkout.json", repo: "api" })).toEqual({
+    expect(stackBuildInput({ stackMapPath: "/p/checkout.json", skipAcceptanceReview: false })).toEqual({
+      stackMapPath: "/p/checkout.json",
+      skipAcceptanceReview: false,
+    });
+    expect(stackBuildInput({ stackMapPath: "/p/checkout.json", repo: "api", skipAcceptanceReview: true })).toEqual({
       stackMapPath: "/p/checkout.json",
       repo: "api",
+      skipAcceptanceReview: true,
     });
   });
 

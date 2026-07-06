@@ -48,11 +48,21 @@ lever. Override per run via env (passed through to the workflow):
 e.g. `XIV_TIER=quality xiv stack build --feature payments --all-repos`. These are **pack settings**,
 so `xiv update` after changing defaults in `pack/agents.ts`.
 
+The other big cost/time lever is `--skip-acceptance-review`: it drops the local acceptance-review
+step from the implement loop (validation — tests/lint/typecheck — still gates every entry), which
+is usually the right trade when the issues are fully spec'd and GitHub AI reviewers run at push
+time anyway. Set it once at plan time to make it the feature-wide default
+(`xiv stack plan … --skip-acceptance-review`, recorded in the stack map), or per run on
+`xiv stack build` / `xiv implement` / `xiv ship`. Per-run flags OR with the map default — they can
+force skipping on, but never re-enable review for a map that opted out.
+
 ```bash
 cd /path/to/target-repo
 xiv stack init                                   # one-time: jj git init --colocate
 xiv stack plan ENG-400 --feature checkout        # Linear project/parent -> ordered stack map
+                                                 #   (--skip-acceptance-review records the no-local-review default)
 xiv stack build  --feature checkout              # overnight: build every entry locally, no push. Resumable.
+                                                 #   (--skip-acceptance-review to drop the local review step this run)
 xiv stack status --feature checkout              # see positions, statuses, branches, PRs
 xiv stack preview --feature checkout             # git checkout the tip = preview the whole feature
 xiv stack push   --feature checkout --count 5    # publish the lowest 5 as stacked PRs (+ re-sync re-flowed PRs)

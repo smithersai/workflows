@@ -54,6 +54,9 @@ descendants.
   below are untouched. Pushing a rewritten branch force-updates its PR and may
   dismiss prior approvals — that's expected.
 - NEVER merge any PR. Never run `gh pr merge`; never enable auto-merge.
+- ANONYMITY: never name the tooling behind this work in commit messages, code comments, or any
+  review reply — no `xiv`, no `smithers`, no internal workflow or command names. It's a private
+  internal tool; everything others will see must read as ordinary human-authored work.
 - Report each addressed finding (`pr`, `branch`, `finding`, `commit`), each
   skipped finding (`pr`, `finding`, `reason`), and EVERY branch you pushed in
   `pushedBranches` (so the re-request step knows which PRs to ping).

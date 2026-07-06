@@ -23,7 +23,7 @@ const inputSchema = z.object({
   stackMapPath: z.string().default(""),
   repo: z.string().default(""),
   reviewers: z.array(z.string()).default(["claude", "codex"]),
-  maxRounds: z.number().int().default(6),
+  maxRounds: z.number().int().default(4),
   pollIntervalSec: z.number().int().default(90),
   maxAttempts: z.number().int().default(20),
 });
@@ -60,7 +60,7 @@ export default smithers((ctx) => {
   const repo = ctx.input.repo;
   const reviewers = ctx.input.reviewers ?? ["claude", "codex"];
   const mention = reviewers.map((reviewer) => `@${reviewer}`).join(" ");
-  const maxRounds = ctx.input.maxRounds ?? 6;
+  const maxRounds = ctx.input.maxRounds ?? 4;
   const pollIntervalSec = ctx.input.pollIntervalSec ?? 90;
   const maxAttempts = ctx.input.maxAttempts ?? 20;
 

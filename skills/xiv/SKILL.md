@@ -51,10 +51,19 @@ job is a loop, not a one-shot:
 
 These hold across every xiv flow unless the human explicitly overrides them in this conversation:
 
+- **Panic button — `xiv panic`.** If a workflow is running away, looping, or visibly burning
+  credits, run `xiv panic` (alias for `xiv down`) to cancel ALL active/orphaned Smithers runs at
+  once. It's the fast kill switch; use `xiv cancel <run>` when you only want to stop one. Reach for
+  it first and diagnose after — a cancelled run is recoverable, a runaway spend is not.
 - **Never merge a PR.** No `gh pr merge`, no auto-merge. Merging is the human's call.
 - **Never submit or push a review without explicit instruction.** Generating a review is fine;
   posting it to GitHub is a separate, human-authorized step. When unsure, print and ask.
 - **Never push someone else's branch** or force-push without being told to.
+- **Keep the tooling anonymous.** `xiv` (and `smithers` under it) is a private internal tool —
+  never name it, or any of its commands/workflows, in commit messages, PR titles/bodies, review
+  comments, code comments, or branch names. Everything that lands in a repo or on GitHub must read
+  as ordinary human-authored work. (The `🤖 Generated with Claude Code` trailer is fine where a
+  repo uses it; don't append internal workflow names to it.)
 - **Default to the cheap model tier.** Only raise it (`XIV_TIER=quality`) when the human asks or
   the task is genuinely hard. See `references/authoring.md`.
 - **Don't hardcode flags from memory.** The CLI is the source of truth: run `xiv <command> -h` for
@@ -72,6 +81,7 @@ Match the user's intent to a row, read that doc, then run the command it points 
 | Drive a PR to AI approval (loop) | `references/review.md` | `xiv pr refine` |
 | Build a whole Linear feature as a stack of PRs | `references/stack.md` → then the `stack-plan` and `xiv-operator` skills, and `xiv how-to` | `xiv stack …` |
 | Check on, recover, or cancel a running workflow | `references/smithers-ops.md` | `xiv ps` / `logs` / `ui` / `inspect` / `down` / `cancel` |
+| Kill a runaway / credit-burning workflow immediately | `references/smithers-ops.md` | `xiv panic` (= `xiv down`) |
 | Author, test, or iterate a workflow itself | `references/authoring.md` | `xiv dev` / `check`, `xiv init` / `update` |
 | Understand the engine, read runs fluently, or dig into Smithers' own docs | `references/smithers.md` | (concepts + doc pointers) |
 

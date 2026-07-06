@@ -23,6 +23,9 @@ const inputSchema = z.object({
   repoSlug: z.string().default(""),
   repos: z.record(z.string(), repoConfigSchema).default({}),
   stackMapPath: z.string().default(""),
+  // Recorded on the map as the feature-wide default: build every entry without
+  // the local acceptance-review step (validation still gates each build).
+  skipAcceptanceReview: z.boolean().default(false),
 });
 
 const plannedStackSchema = z.object({
@@ -98,6 +101,7 @@ export default smithers((ctx) => {
               feature: ctx.input.feature,
               repoSlug: ctx.input.repoSlug,
               repos: ctx.input.repos,
+              skipAcceptanceReview: ctx.input.skipAcceptanceReview,
               source: {
                 linearProjectId: planned?.linearProjectId || undefined,
                 parentIssueId: planned?.parentIssueId || undefined,

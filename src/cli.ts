@@ -44,6 +44,11 @@ const trailingArgs = Args.text({ name: "arg" }).pipe(
 const tddFlag = Options.boolean("tdd").pipe(
   Options.withDescription("Ask the implementation workflow to plan tests before production changes."),
 );
+const skipAcceptanceReviewFlag = Options.boolean("skip-acceptance-review").pipe(
+  Options.withDescription(
+    "Skip the local acceptance-review step of the implement loop; validation (tests/lint/typecheck) still gates. On `stack plan` this is recorded in the stack map as the feature-wide default; on `implement`/`ship`/`stack build` it applies to that run and ORs with the map default.",
+  ),
+);
 const baseOption = Options.text("base").pipe(
   Options.withDescription("Base branch for a newly opened pull request."),
   Options.withDefault("main"),
@@ -205,11 +210,11 @@ const update = Command.make("update", {}, runInstallCommand).pipe(
 
 const implement = Command.make(
   "implement",
-  { issueId: issueIdArg, tdd: tddFlag },
-  ({ issueId, tdd }) =>
+  { issueId: issueIdArg, tdd: tddFlag, skipAcceptanceReview: skipAcceptanceReviewFlag },
+  ({ issueId, tdd, skipAcceptanceReview }) =>
     runWorkflowCommand({
       workflow: workflowFor("implement"),
-      input: implementInput({ issueId, tdd }),
+      input: implementInput({ issueId, tdd, skipAcceptanceReview }),
     }),
 ).pipe(
   Command.withDescription("Implement a Linear issue on a dedicated branch."),
@@ -217,11 +222,11 @@ const implement = Command.make(
 
 const ship = Command.make(
   "ship",
-  { issueId: issueIdArg, base: baseOption, tdd: tddFlag },
-  ({ issueId, base, tdd }) =>
+  { issueId: issueIdArg, base: baseOption, tdd: tddFlag, skipAcceptanceReview: skipAcceptanceReviewFlag },
+  ({ issueId, base, tdd, skipAcceptanceReview }) =>
     runWorkflowCommand({
       workflow: workflowFor("ship"),
-      input: shipInput({ issueId, base, tdd }),
+      input: shipInput({ issueId, base, tdd, skipAcceptanceReview }),
     }),
 ).pipe(
   Command.withDescription("Implement a Linear issue, open a PR, and drive review to approval."),
@@ -277,6 +282,9 @@ const down = Command.make("down", { args: trailingArgs }, ({ args }) => runPasst
 const cancel = Command.make("cancel", { args: trailingArgs }, ({ args }) => runPassthroughCommand("cancel", args)).pipe(
   Command.withDescription("Forward to `smithers cancel` in SMITHERS_HOME (cancel a specific run)."),
 );
+const panic = Command.make("panic", { args: trailingArgs }, ({ args }) => runPassthroughCommand("down", args)).pipe(
+  Command.withDescription("PANIC BUTTON: alias for `xiv down` — cancel ALL active/orphaned Smithers runs NOW. Reach for this the moment a workflow runs away or burns credits."),
+);
 
 const stackInit = Command.make("init", {}, () =>
   toEffect(() => runStackInit({ targetCwd: process.cwd() })),
@@ -286,30 +294,49 @@ const stackInit = Command.make("init", {}, () =>
 
 const stackPlan = Command.make(
   "plan",
-  { source: sourceArg, feature: featureOption, base: baseOption, repos: repoArgsOption, plan: planOption },
-  ({ source, feature, base, repos, plan }) => {
+  {
+    source: sourceArg,
+    feature: featureOption,
+    base: baseOption,
+    repos: repoArgsOption,
+    plan: planOption,
+    skipAcceptanceReview: skipAcceptanceReviewFlag,
+  },
+  ({ source, feature, base, repos, plan, skipAcceptanceReview }) => {
     const repoRegistry = parseRepoArgs(repos, base, process.cwd());
     const planPath = optionValue(plan);
     if (planPath !== undefined) {
-      return toEffect(() => runStackPlanFromFile(stackContext(feature), { planPath, repos: repoRegistry }));
+      return toEffect(() =>
+        runStackPlanFromFile(stackContext(feature), { planPath, repos: repoRegistry, skipAcceptanceReview }),
+      );
     }
     const resolvedSource = optionValue(source);
     if (resolvedSource === undefined) {
       return Effect.fail(new Error("Provide a <source> (Linear project or parent issue) or --plan <file>."));
     }
-    return toEffect(() => runStackPlan(stackContext(feature), { source: resolvedSource, repos: repoRegistry }));
+    return toEffect(() =>
+      runStackPlan(stackContext(feature), { source: resolvedSource, repos: repoRegistry, skipAcceptanceReview }),
+    );
   },
 ).pipe(
-  Command.withDescription("Plan a stack: fetch a Linear project/parent and assign issues to repos, or persist a resolved --plan <file> from the stack-plan skill. --repo key=path (repeatable) for multi-repo."),
+  Command.withDescription("Plan a stack: fetch a Linear project/parent and assign issues to repos, or persist a resolved --plan <file> from the stack-plan skill. --repo key=path (repeatable) for multi-repo. --skip-acceptance-review records the no-local-review default for every build of this feature."),
 );
 
 const stackBuild = Command.make(
   "build",
-  { feature: featureOption, repo: repoKeyOption, allRepos: allReposOption, detach: detachOption },
-  ({ feature, repo, allRepos, detach }) =>
-    toEffect(() => runStackBuild(stackContext(feature), { repo: optionValue(repo), allRepos, detach })),
+  {
+    feature: featureOption,
+    repo: repoKeyOption,
+    allRepos: allReposOption,
+    detach: detachOption,
+    skipAcceptanceReview: skipAcceptanceReviewFlag,
+  },
+  ({ feature, repo, allRepos, detach, skipAcceptanceReview }) =>
+    toEffect(() =>
+      runStackBuild(stackContext(feature), { repo: optionValue(repo), allRepos, detach, skipAcceptanceReview }),
+    ),
 ).pipe(
-  Command.withDescription("Build entries locally, bottom to top. Resumable. --all-repos fans out per repo (parallel); --repo <key> builds one; --detach runs in the background."),
+  Command.withDescription("Build entries locally, bottom to top. Resumable. --all-repos fans out per repo (parallel); --repo <key> builds one; --detach runs in the background. --skip-acceptance-review builds without the local review step (ORs with the map's plan-time default)."),
 );
 
 const stackStatus = Command.make("status", { feature: featureOption }, ({ feature }) =>
@@ -496,6 +523,7 @@ const root = Command.make("xiv", {}, () =>
     ui,
     inspect,
     down,
+    panic,
     cancel,
   ]),
 );

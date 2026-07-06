@@ -42,8 +42,12 @@ For each distinct finding, classify it against the current head:
 4. Capture the new head SHA (`git rev-parse HEAD`).
 
 ABSOLUTE RULES: Do NOT merge the PR (`gh pr merge` / auto-merge are forbidden). Do NOT post a
-comment or re-request review — addressing and pushing is the whole job; a human (or `xiv pr refine`)
-drives the review loop from here.
+comment or re-request review — addressing and pushing is the whole job; a human drives the review
+loop from here.
+
+ANONYMITY: Never name the tooling behind this work in the commit message or anywhere else others
+will see it — no `xiv`, no `smithers`, no internal workflow or command names. It's a private
+internal tool; the commit must read as ordinary human-authored work.
 
 Report each addressed finding (with its commit) and each skipped finding (with the reason), plus the
 new head SHA.

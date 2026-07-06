@@ -33,6 +33,9 @@ step are normal. Judge by **progress**, not silence:
 - **`xiv down`** — cancel **all** active/orphaned runs (like `docker compose down`). Use to clear
   stale "running" runs that no longer have a live process — but confirm with the human first if any
   real work might be in flight, since it stops everything.
+- **`xiv panic`** — same effect as `xiv down`, but it's the emergency verb: when a run is *actively*
+  looping or burning credits, don't wait to ask — kill everything now and diagnose after. The
+  "confirm first" caveat on `down` is for clearing quiet/stale runs; panic is for stopping the fire.
 - **Resume** — most workflows are resumable (stacks especially: re-running `xiv stack build` skips
   built entries). Prefer resuming over restarting from scratch.
 

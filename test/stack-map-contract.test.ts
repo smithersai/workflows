@@ -15,6 +15,7 @@ const FULL_FIXTURE = {
   },
   tips: { api: "feat/eng-101", web: "feat/eng-102" },
   engine: "jj",
+  skipAcceptanceReview: true,
   source: {
     linearProjectId: "PROJ-1",
     issueIds: ["ENG-100", "ENG-101", "ENG-102"],
@@ -57,6 +58,7 @@ describe("stack-map CLI/pack contract", () => {
       feature: "checkout",
       repoSlug: "app-abc12345",
       repos: { app: { path: "/code/app", baseBranch: "main" } },
+      skipAcceptanceReview: true,
       source: { issueIds: ["ENG-100"] },
       entries: [
         {
