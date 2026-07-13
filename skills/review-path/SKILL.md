@@ -1,11 +1,13 @@
 ---
 name: review-path
-description: Plan a human-friendly code review path for a change without finding bugs. Use when the user asks for a review order, guided review, file criticality, attention budget, blast-radius-based prioritization, or wants help understanding a PR/diff from unstaged work, staged work, a commit/range, or a GitHub PR number.
+description: Plan a human-friendly code review path for a change without finding bugs. Use when the user asks for a review order, guided review, file criticality, attention budget, blast-radius-based prioritization, or wants help understanding a PR/diff from unstaged work, staged work, a commit/range, or a GitHub PR number. For Socratic "what should I look for" hints and habit-building probes, use review-lens instead or alongside.
 ---
 
 # review-path
 
 Create a review path: the order a human should read changed files, how those files group, and how much attention each deserves. Do **not** perform a bug-finding code review unless the user separately asks for one.
+
+**Companion:** for *what questions to ask while reading* (Socratic probes by concern domain, habit-building, especially on AI-authored diffs), use **`review-lens`**. Path = where/how much to look; lens = what to think about. Keep the outputs separate.
 
 ## Workflow
 
