@@ -8,8 +8,13 @@ deliberately. The axis that matters most is **does code get changed and pushed?*
 |---|---|---|---|
 | `xiv pr review [N]` | inbound | no (comments only) | reviewing a PR (usually someone else's) |
 | `xiv pr fix [N]` | outbound, one-shot | yes, once | applying the findings already on a PR, then stopping |
-| `xiv pr refine [N]` | outbound, loop | yes, repeatedly | driving a PR to all-AI-approved |
+| `xiv pr refine [N]` | outbound, short loop | yes | settling a PR against CI + human comments |
 | `xiv-review-core` skill | inbound, no CLI | no | just printing findings, nothing posted |
+
+**All review here is local.** A review agent reads the diff on this machine; nothing waits on a
+review bot on GitHub, and nothing tags one. Once a PR exists, the only GitHub-side signals left are
+**CI status** and **comments from human reviewers** — that is exactly, and only, what
+`xiv pr refine` acts on.
 
 ## First: resolve what you're acting on
 
@@ -35,9 +40,10 @@ looped?**
 
 - "review X", "leave comments on", "take a look", "but don't push/submit" → **`xiv pr review`**
   (inbound; posts only what you approve, pushes no code).
-- "apply the review comments", "address the findings and push", "fix what the bots flagged" (once,
-  no babysitting) → **`xiv pr fix`**.
-- "get my PR approved", "drive it to green", "loop until claude/codex approve" → **`xiv pr refine`**.
+- "apply the review comments", "address the findings and push" (once, no babysitting) →
+  **`xiv pr fix`**.
+- "get CI green", "fix the failing checks", "handle the review comments on my PR" →
+  **`xiv pr refine`**.
 - "what's wrong with this branch/PR", findings only, **nothing run or posted** → the
   **`xiv-review-core` skill**.
 
@@ -69,20 +75,26 @@ For the *judgment* of what's worth flagging, the **`xiv-review-core` skill** is 
 
 ### `xiv pr fix [N]` — address existing findings once, push
 Reads the findings already on the PR (across all comment surfaces), fixes the valid ones with real
-changes + tests, commits, and pushes **once** — no waiting, no loop, no re-request. Defaults to the
-current branch's PR. Use when the user wants the outstanding feedback applied and then to stop.
+changes + tests, commits, and pushes **once** — no waiting, no loop. Defaults to the current
+branch's PR. Use when the user wants the outstanding feedback applied and then to stop.
 `xiv pr fix -h` for flags.
 
-### `xiv pr refine [N]` — drive to AI approval (loop)
-The full loop on a PR: trigger the AI reviewers, wait, fix findings, re-request, repeat until they
-approve. Edits and pushes your branch each round. Never merges. Defaults to the current branch's PR;
-`xiv pr refine --branch <name>` opens a fresh PR first, then loops. Use when the user wants their PR
-shepherded to green hands-off. `xiv pr refine -h` for flags.
+### `xiv pr refine [N]` — settle CI + human comments
+Takes a snapshot of the PR's status checks and its human review comments, fixes what they raise
+(real changes + tests), and pushes. It is a **short, capped loop** (two rounds by default), not a
+wait: a still-running build ends the round and is reported honestly rather than polled. Never
+merges, never comments, never tags anyone. Defaults to the current branch's PR;
+`xiv pr refine --branch <name>` opens a fresh PR first. `xiv pr refine -h` for flags.
 
 ### `xiv-review-core` skill — findings only, no CLI
 When the user wants findings on a branch/diff/PR but **nothing run and nothing posted** ("review
 this change", "what's wrong with this branch"), defer to the `xiv-review-core` skill. It prints
 prioritized findings and, by design, never submits or pushes.
+
+It is also the contract the *automated* review step follows: the `impl:review` task inside
+`xiv implement` / `xiv ship` / `xiv stack build` runs a local review agent against this same
+judgment, before any PR exists. So the standard is identical whether a human asked for a review or
+the implement loop produced one.
 
 ## Guardrails
 

@@ -13,7 +13,8 @@ run's output, you're reading Smithers.
 
 ## How xiv sits on top
 
-- `xiv init` / `xiv update` install the managed workflow pack into `SMITHERS_HOME` (`~/.smithers`).
+- `xiv init` / `xiv update` install the managed workflow pack into `SMITHERS_HOME` (`~/.smithers`),
+  and also reinstall this repo's skills into your agent directories (`--no-skills` to skip).
 - An `xiv` command starts a workflow run there, pinned to the repo you invoked it from
   (`SMITHERS_TARGET_CWD`).
 - `xiv ps` / `logs` / `ui` / `inspect` / `down` / `cancel` forward straight to the `smithers` CLI.

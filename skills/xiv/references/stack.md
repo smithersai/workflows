@@ -34,17 +34,22 @@ on PATH (`brew install jj`). For the deeper model, see the repo `README.md` and 
 1. **Plan** — order the issues, assign each to a repo, exclude non-code work. → **use the
    `stack-plan` skill.** It's interactive: it auto-assigns the obvious issues and makes the human
    decide the unclear/non-code ones, then persists a resolved plan with `xiv stack plan --plan`.
+   This step runs the most capable model available (Fable 5 at `xhigh`) regardless of `XIV_TIER`,
+   and it is the one place that's worth it: every later command inherits the ordering it writes to
+   the stack map, so a wrong order is a rebuild rather than a bad paragraph.
 2. **Build** — `xiv stack build` runs every entry through `linear-implement` locally, bottom to
    top. Resumable. Long/overnight. → **while it runs, use the `xiv-operator` skill** to babysit it:
    it polls `xiv stack triage`, resumes transient failures, and escalates real problems.
+   Each entry gets up to `--max-iterations` (default 3) `implement → validate → review` passes.
 3. **Inspect** — `xiv stack status` (positions/branches/PRs), `xiv stack preview` (check out the
    tip to try the whole feature), `xiv stack triage` (compact next-action state).
 4. **Publish** — `xiv stack push` is the **only** command that touches GitHub: opens PRs for the
    next batch and re-syncs any open PR a later amend re-flowed.
 5. **Amend** — `xiv stack amend -m "…"` applies a change to one entry and lets jj re-flow it through
    the descendants, then re-validates. Local-only until you `push` again.
-6. **Review** — `xiv stack review` drives the open stacked PRs to all-approved, fixing each finding
-   in its owning branch and cascading up. Never merges.
+6. **Settle** — `xiv stack review` reads the open stacked PRs' CI status and human review comments
+   and fixes what they raise **in the branch that owns the code**, cascading up. Code review itself
+   already happened locally during `build`, so nothing here waits on a reviewer. Never merges.
 
 Multi-repo features fan out with `--all-repos` / `--repo <key>`; each repo gets its own substack.
 

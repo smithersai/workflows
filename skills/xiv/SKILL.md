@@ -23,7 +23,9 @@ agent workflows.
 workflows; `xiv` is the thin wrapper that launches and manages them. A command acts on the repo you
 invoke it from, and run state (logs, executions, stack maps) lives under `SMITHERS_HOME` —
 `~/.smithers` by default. The work itself is Linear-issue-driven and lands as normal GitHub branches
-and PRs. After the pack changes, `xiv update` reinstalls the managed workflows into `SMITHERS_HOME`.
+and PRs. After the pack or the skills change, `xiv update` reinstalls both — the managed workflows
+into `SMITHERS_HOME`, and this repo's skills into your agent directories (`--no-skills` for the
+pack alone).
 To go deeper on Smithers itself — the concepts, reading runs, and its docs — see
 `references/smithers.md`.
 
@@ -64,8 +66,10 @@ These hold across every xiv flow unless the human explicitly overrides them in t
   comments, code comments, or branch names. Everything that lands in a repo or on GitHub must read
   as ordinary human-authored work. (The `🤖 Generated with Claude Code` trailer is fine where a
   repo uses it; don't append internal workflow names to it.)
-- **Default to the cheap model tier.** Only raise it (`XIV_TIER=quality`) when the human asks or
-  the task is genuinely hard. See `references/authoring.md`.
+- **Default to the cheap model tier and the default iteration cap.** Only raise the tier
+  (`XIV_TIER=quality`) or the pass limit (`--max-iterations`, default 3) when the human asks or the
+  task is genuinely hard — and say so when you do. A loop burning passes is usually a signal to
+  stop and escalate, not to add passes. See `references/authoring.md`.
 - **Don't hardcode flags from memory.** The CLI is the source of truth: run `xiv <command> -h` for
   current flags, and `xiv how-to` for the full stacked-feature runbook.
 
@@ -78,7 +82,7 @@ Match the user's intent to a row, read that doc, then run the command it points 
 | Implement or ship a single Linear issue (e.g. "implement ENG-123", "ship ENG-123") | `references/implement.md` | `xiv implement` / `xiv ship` |
 | Review a PR one-off and decide what to submit | `references/review.md` (+ the `xiv-review-core` skill for the actual review judgment) | `xiv pr review` |
 | Address the findings already on a PR, once | `references/review.md` | `xiv pr fix` |
-| Drive a PR to AI approval (loop) | `references/review.md` | `xiv pr refine` |
+| Settle a PR against CI + human review comments | `references/review.md` | `xiv pr refine` |
 | Build a whole Linear feature as a stack of PRs | `references/stack.md` → then the `stack-plan` and `xiv-operator` skills, and `xiv how-to` | `xiv stack …` |
 | Check on, recover, or cancel a running workflow | `references/smithers-ops.md` | `xiv ps` / `logs` / `ui` / `inspect` / `down` / `cancel` |
 | Kill a runaway / credit-burning workflow immediately | `references/smithers-ops.md` | `xiv panic` (= `xiv down`) |
@@ -93,12 +97,18 @@ Match the user's intent to a row, read that doc, then run the command it points 
   worktree, *you* pick the verdict and findings, then submit. Only posts comments, never pushes
   code, and never submits without your say-so. Best for **someone else's** PR.
 - **`xiv pr fix [N]`** — *outbound, one-shot*: address the findings already on a PR (edits code,
-  commits, **pushes once**), no loop, no re-request. Defaults to the current branch's PR.
-- **`xiv pr refine [N]`** — *outbound, loop*: drive a PR to all-AI-approved — trigger reviewers,
-  fix, re-request, repeat until green. Edits and **pushes** your branch. Defaults to the current
-  branch's PR; `--branch` opens a new PR first. Best for **your own** PR.
+  commits, **pushes once**), no loop, nothing posted back. Defaults to the current branch's PR.
+- **`xiv pr refine [N]`** — *outbound, short loop*: settle a PR against **CI status and human
+  review comments** — read them, fix what they raise, **push**. Capped at two rounds; it does not
+  poll and does not tag anyone. Defaults to the current branch's PR; `--branch` opens a new PR
+  first. Best for **your own** PR.
 - **the `xiv-review-core` skill** — the code-review *judgment* itself (no CLI): gather context,
-  find the findings, print them. Never posts or pushes anything.
+  find the findings, print them. Never posts or pushes anything. It is also the contract the
+  automated local review step inside `implement`/`ship`/`stack build` follows.
+
+All code review runs **locally**, before anything is pushed. Nothing in `xiv` waits on a review bot
+on GitHub or asks one for a re-review; after a PR exists, CI and humans are the only remaining
+signals.
 
 When the user says "review a PR," figure out **whose PR**, **whether they want code changed/pushed**,
 and **whether they want it submitted** — `references/review.md` walks through it.

@@ -51,16 +51,32 @@ PREREQUISITES
   - The repo is a git repo on its base branch (default main; pass --base to plan otherwise).
 
 COST
-  Agents default to a cheap tier (Sonnet for work, Haiku for validate, low codex reasoning) —
-  fine for fully-spec'd Linear work. For a hard feature, prefix the command with
-  XIV_TIER=quality (leads with Opus). A hard cap is available via XIV_AGENT_MAX_USD.
+  Agents default to a cheap tier — a mixed pipeline: codex Luna for the mechanical steps
+  (fetch, validate), codex Sol for planning, Claude Sonnet 5 for implementing, codex Terra
+  for review. Fine for fully-spec'd Linear work. For a hard feature, prefix the command with
+  XIV_TIER=quality: implement moves to Opus 5, review to Sol, and planning to xhigh effort.
+  Only those three steps change; the mechanical ones stay put. A hard cap is available via
+  XIV_AGENT_MAX_USD.
+  Stack planning is off that ladder — "xiv stack plan" always runs Claude Fable 5 at xhigh,
+  because it runs once and fixes the issue order every later command inherits.
   For fully-spec'd stacks, --skip-acceptance-review (plan-time default or per build run) drops
-  the local review step; validation still gates, and GitHub AI reviewers still run at push time.
+  the local review step from the implement loop; validation (tests/lint/typecheck) still gates
+  every entry, and CI still runs once the PR is pushed.
+  --max-iterations (default 3, clamped 1-10) caps the implement->validate->review passes per
+  issue on "xiv implement", "xiv ship", and "xiv stack build". Raising it only costs anything
+  for issues that actually fail a pass.
+
+REVIEW
+  Code review happens LOCALLY, inside the implement loop, before anything is pushed — a review
+  agent reads the working-tree diff against the issue's acceptance criteria. Nothing is ever
+  waiting on a review bot on GitHub. Once a PR exists, the only remaining GitHub-side signals
+  are CI status and comments from human reviewers; "xiv stack review" / "xiv pr refine" read
+  those, fix what they raise, and push.
 
 ONE ISSUE (no stack needed)
-  xiv implement <ENG-123>     build it on a branch, local
-  xiv ship <ENG-123>          build it + open a PR + drive AI review to approval
-  xiv pr refine [<N>]         drive a PR (default: current branch's) to AI approval
+  xiv implement <ENG-123>     build it on a branch, local (plan -> implement -> validate -> review)
+  xiv ship <ENG-123>          build it + open a PR + settle CI and human comments
+  xiv pr refine [<N>]         settle a PR (default: current branch's) against CI + human comments
   xiv pr fix [<N>]            address the existing review findings once and push
   xiv pr review [<N>]         one-off interactive review of a PR (you submit)
 

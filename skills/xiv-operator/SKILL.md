@@ -70,6 +70,13 @@ field tells you the next command. This skill is the *recovery* layer on top of t
   or touch credentials. Publishing and code changes are the human's decisions.
 - **NEVER** try to fix an auth problem — you can't, and retrying wastes time. Escalate.
 - **Cap resumes at 3** per run. If a run keeps failing the same way, escalate.
+- **Resume with the flags the build was launched with.** A resume is a continuation, not a fresh
+  decision. If the original `xiv stack build` carried `--max-iterations`, `--skip-acceptance-review`,
+  `--repo`, or an `XIV_TIER=` / `XIV_*` env prefix, carry them through verbatim — otherwise you
+  silently downgrade the run (e.g. back to the default 3 passes) and the human gets a different
+  build than they asked for. If you don't know how it was launched, ask; don't guess a flag set.
+- **Never raise the tier or the iteration cap yourself.** Both cost real money. If a run is burning
+  passes, that is a signal to escalate, not to buy more of them.
 - **Escalate on any unknown signal.** A wrong guess is worse than asking.
 
 ## References (load when you need them)

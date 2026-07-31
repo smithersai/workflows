@@ -30,6 +30,21 @@ smithers inspect <runId>                   # confirm a resume took
 `xiv stack build` is **idempotent** — running it again never rebuilds finished entries, so
 "resume the build" is always just `xiv stack build --feature <slug> --detach`.
 
+**Carry the original launch flags through on a resume.** Idempotent means finished entries are
+skipped; it does **not** mean the flags persist. Anything the human passed the first time —
+`--max-iterations N`, `--skip-acceptance-review`, `--repo <key>`, or an env prefix like
+`XIV_TIER=quality` — has to be repeated, or the remaining entries build under different settings
+than the ones already done. `--max-iterations` silently falls back to 3 if you omit it.
+
+```text
+# launched as:
+XIV_TIER=quality xiv stack build --feature payments --max-iterations 5 --detach
+# resume as (identical, plus nothing):
+XIV_TIER=quality xiv stack build --feature payments --max-iterations 5 --detach
+```
+
+If you can't tell how it was launched, ask the human rather than guessing a flag set.
+
 ## Forbidden (escalate to the human instead — never run these)
 
 ```text
