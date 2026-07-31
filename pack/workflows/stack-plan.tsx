@@ -7,7 +7,7 @@
 /** @jsxImportSource smithers-orchestrator */
 import { createSmithers } from "smithers-orchestrator";
 import { z } from "zod/v4";
-import { providers } from "../agents";
+import { stackPlanAgent } from "../agents";
 import { createStackMap, saveStackMap, type StackEntry } from "../lib/stack-map";
 import StackPlanPrompt from "../prompts/stack-plan.mdx";
 
@@ -64,7 +64,7 @@ export default smithers((ctx) => {
         <Task
           id="plan"
           output={plannedStackSchema}
-          agent={providers.claude}
+          agent={stackPlanAgent}
           timeoutMs={900_000}
           heartbeatTimeoutMs={300_000}
         >

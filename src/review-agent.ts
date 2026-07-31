@@ -29,10 +29,16 @@ function reviewEngine(): "claude" | "codex" {
   return process.env.XIV_ENGINE === "codex" ? "codex" : "claude";
 }
 
+/**
+ * DUPLICATED TIER RESOLUTION — keep in sync with `pack/agents.ts`, which is the source of truth.
+ * The pack ships to SMITHERS_HOME and is not importable from the CLI, so the mapping is repeated
+ * here. It has silently drifted a generation before; when you change the tiers there, change them
+ * here in the same commit.
+ */
 function claudeModel(): string {
   const override = process.env.XIV_MODEL_HEAVY;
   if (override !== undefined && override.trim() !== "") return override;
-  return process.env.XIV_TIER === "quality" ? "claude-opus-4-8" : "claude-sonnet-4-6";
+  return process.env.XIV_TIER === "quality" ? "claude-opus-5" : "claude-sonnet-5";
 }
 
 function fill(template: string, tokens: Readonly<Record<string, string>>): string {
@@ -89,7 +95,7 @@ export async function runLocalReview(options: LocalReviewOptions): Promise<Local
       ? [
           "codex", "exec", "--skip-git-repo-check",
           "--dangerously-bypass-approvals-and-sandbox",
-          "-m", process.env.XIV_CODEX_MODEL ?? "gpt-5.5", prompt,
+          "-m", process.env.XIV_CODEX_MODEL ?? "gpt-5.6-terra", prompt,
         ]
       : [
           "claude", "-p", prompt, "--model", claudeModel(),
