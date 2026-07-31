@@ -10,6 +10,15 @@ export function packagedPackRoot(): AbsolutePath {
   return join(repoRoot(), "pack");
 }
 
+/**
+ * Root the `skills` CLI scans for SKILL.md files. It auto-discovers from the repo root, so this is
+ * deliberately the root and not `skills/` — passing the subdirectory would also work today but
+ * would silently miss a skill added elsewhere in the repo later.
+ */
+export function packagedSkillsRoot(): AbsolutePath {
+  return repoRoot();
+}
+
 /** Root directory under SMITHERS_HOME where stack maps live. */
 export function stacksRoot(smithersHome: AbsolutePath): AbsolutePath {
   return join(smithersHome, "stacks");

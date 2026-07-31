@@ -163,6 +163,43 @@ export async function installPack(options: InstallOptions): Promise<InstallResul
   return { copied: nextManifest.files.length, backups, smithersHome: options.smithersHome };
 }
 
+/**
+ * Install this repo's skills into the user's agent directories via the `skills` CLI.
+ *
+ * Separate from `installPack` on purpose: the pack is workflow code copied into SMITHERS_HOME and
+ * executed by the engine, while skills are prose read by whatever agent is driving the CLI. They
+ * have different destinations, different lifecycles, and different failure modes — a skills install
+ * needs the network, so it must never be able to fail a pack update.
+ *
+ * `add` (not `update`) is correct here: `skills update` refreshes previously-added packages from
+ * their original remote source, whereas we are always re-adding from this working tree, which may
+ * be ahead of every commit.
+ */
+export async function installSkills(options: {
+  readonly skillsRoot: AbsolutePath;
+  /** Install user-level rather than into the current project. */
+  readonly global: boolean;
+}): Promise<void> {
+  await runInherited({
+    cmd: [
+      "npx",
+      "--yes",
+      "skills@latest",
+      "add",
+      options.skillsRoot,
+      // Every skill in the repo — the set is curated here, so there is nothing to choose.
+      "--skill",
+      "*",
+      // Deliberately NOT `--all`, which expands to `--skill '*' --agent '*' -y` and would silently
+      // install into every agent it can find. Which agents to target is the user's call, so leave
+      // `--agent` unset and let the CLI prompt. `runInherited` passes stdin through, so the picker
+      // works. Passing --global also settles the scope question, so no extra prompt appears.
+      ...(options.global ? ["--global"] : []),
+    ],
+    cwd: options.skillsRoot,
+  });
+}
+
 export async function isInitialized(smithersHome: AbsolutePath): Promise<boolean> {
   return (await readManifest(smithersHome)) !== null;
 }
