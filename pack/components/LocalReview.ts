@@ -1,10 +1,20 @@
 import { z } from "zod/v4";
 
 /**
- * Shape produced by a local PR review (an agent reading a PR in a worktree). The single source of
- * truth for both the interactive CLI command (`xiv pr review`) and a future Smithers reviewer Task:
- * the CLI parses an agent's output file against `localReviewSchema`; a Smithers Task would use the
- * same export as its `output={}` slot. Mirrors the style of PrReview.ts (zod/v4, nullable defaults).
+ * Shape produced by a local code review (an agent reading a diff it has checked out). This is THE
+ * review schema — there is no second vocabulary. Both consumers use this exact export:
+ *
+ *   - the interactive CLI (`xiv pr review`), which parses the agent's output file against it;
+ *   - the `impl:review` Task in linear-implement, which uses it as its `output={}` slot.
+ *
+ * The fields are deliberately strict (no default on `verdict`): a reviewer that cannot produce a
+ * real verdict must fail its Task rather than silently degrade into a fake one. In the implement
+ * loop that Task is `continueOnFail`, so a failed/unparseable review simply yields no review for
+ * that iteration and the mechanical validation gate decides on its own.
+ *
+ * `path` / `startLine` / `line` / `inlineable` anchor a finding to a PR diff. They are only
+ * meaningful when the review targets a pushed PR; a local (pre-PR) review leaves `inlineable`
+ * false and may still set `path`/`line` to point at the code.
  */
 
 export const findingSeveritySchema = z.enum(["blocker", "high", "medium", "low", "nit"]);

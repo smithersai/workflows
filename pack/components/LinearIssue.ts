@@ -1,6 +1,11 @@
 import { z } from "zod/v4";
 
 export const linearIssueSchema = z.object({
+  // MUST be explicitly true only when the issue content was actually retrieved from
+  // Linear. On every fetch failure (auth, not-found, MCP transport) the agent returns
+  // false and the workflow hard-fails before planning — otherwise the error text
+  // flows downstream and gets faithfully "implemented" as if it were the issue.
+  fetched: z.boolean().default(true),
   key: z.string(),
   title: z.string(),
   description: z.string().default(""),

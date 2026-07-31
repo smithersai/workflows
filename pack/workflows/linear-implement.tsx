@@ -9,7 +9,7 @@ import { createSmithers, Loop } from "smithers-orchestrator";
 import { z } from "zod/v4";
 import { linearImplementAgents } from "../agents";
 import { finalizeSchema, linearIssueSchema, type LinearIssue } from "../components/LinearIssue";
-import { reviewOutputSchema } from "../components/Review";
+import { localReviewSchema } from "../components/LocalReview";
 import { implementOutputSchema, validateOutputSchema } from "../components/ValidationLoop";
 import AcceptanceReviewPrompt from "../prompts/acceptance-review.mdx";
 import ImplementPrompt from "../prompts/implement.mdx";
@@ -25,19 +25,32 @@ const planOutputSchema = z.object({
 const inputSchema = z.object({
   issueId: z.string().default(""),
   tdd: z.boolean().default(false),
-  // Skip the acceptance-review step entirely. The loop's done-gate already treats
-  // "no valid reviews" as "gate on validation alone" (see the `done` computation),
-  // so skipping cannot wedge the loop — validation still decides.
+  // Skip the local review step entirely. The loop's done-gate already treats an absent
+  // review as "gate on validation alone" (see the `done` computation), so skipping cannot
+  // wedge the loop — validation still decides.
   skipAcceptanceReview: z.boolean().default(false),
+  // How many implement→validate→review passes to allow before giving up and returning the last
+  // attempt. Raising this only costs anything for issues that actually fail a pass; a clean issue
+  // still exits after one. Clamped below so a bad input cannot spin forever or disable the loop.
+  maxIterations: z.number().int().default(3),
 });
+
+/** Iteration count is operator input, so bound it rather than trusting it. */
+function clampIterations(value: number): number {
+  if (!Number.isFinite(value)) return 3;
+  return Math.min(Math.max(Math.trunc(value), 1), 10);
+}
+
+const fetchGateSchema = z.object({ ok: z.boolean() });
 
 const { Workflow, Task, Sequence, smithers } = createSmithers({
   input: inputSchema,
   issue: linearIssueSchema,
+  fetchGate: fetchGateSchema,
   plan: planOutputSchema,
   implement: implementOutputSchema,
   validate: validateOutputSchema,
-  review: reviewOutputSchema,
+  review: localReviewSchema,
   // The workflow's primary result table MUST be named `output`: the engine reads
   // `schema.output` to populate RunResult.output, which is what SubflowLoose
   // (in stack-build / linear-to-pr) consumes. Naming it anything else makes the
@@ -84,29 +97,39 @@ export default smithers((ctx) => {
     tdd ? "Follow the plan's test-first approach: write/update tests before production code." : null,
   ].filter((part): part is string => part !== null).join("\n\n---\n");
 
+  // Both reads are deliberately UNPINNED, so they resolve against the CURRENT iteration.
+  // Reading review state across all iterations is a wedging bug: a `request_changes` from
+  // iteration 1 would still be in `ctx.outputs.review` at iteration 3 and block forever,
+  // and symmetrically a stale `approve` would let a later broken iteration through.
   const validate = ctx.outputMaybe("validate", { nodeId: "impl:validate" });
-  const reviews = ctx.outputs.review ?? [];
+  const review = ctx.outputMaybe("review", { nodeId: "impl:review" });
   const hasValidated = validate !== undefined;
   const validationPassed = hasValidated && validate.allPassed !== false;
-  // A reviewer agent that fails to emit a valid verdict degrades to reviewer:"unknown"
-  // (see Review.tsx defaults). Such a non-review must NOT hold the loop hostage: it can
-  // never approve, so requiring approval would force every issue to burn maxIterations
-  // with no real review gating. Respect real reviews (approve OR reject); when none were
-  // produced, gate on validation alone (validate already runs tests/lint/typecheck).
-  const validReviews = reviews.filter((review) => review.reviewer !== "unknown");
-  const anyApproved = validReviews.some((review) => review.approved === true);
-  const done = validationPassed && (anyApproved || validReviews.length === 0);
+  // VALIDATION IS THE ARBITER — the review is advisory and may only ever WITHHOLD done, never
+  // grant it. `localReviewSchema.verdict` has no default on purpose: a reviewer that cannot emit
+  // a real verdict fails its (continueOnFail) Task, so `review` is simply undefined here. That
+  // must NOT hold the loop hostage — a non-review can never approve, so demanding approval would
+  // burn every iteration with no real review gating. Hence: skipped, failed, or unparseable
+  // review => gate on validation alone (it already runs tests/lint/typecheck).
+  //   request_changes -> not done (send it back for another pass)
+  //   comment         -> non-blocking by definition; done if validation passed
+  //   approve         -> done if validation passed
+  const requestedChanges = review?.verdict === "request_changes";
+  const done = validationPassed && !requestedChanges;
 
   const feedbackParts: string[] = [];
   if (validate !== undefined && !validationPassed && validate.failingSummary) {
     feedbackParts.push(`VALIDATION FAILED:\n${validate.failingSummary}`);
   }
-  for (const review of validReviews) {
-    if (review.approved === false) {
-      feedbackParts.push(`REVIEWER REJECTED:\n${review.feedback}`);
-      for (const issueItem of review.issues ?? []) {
-        feedbackParts.push(`  [${issueItem.severity}] ${issueItem.title}: ${issueItem.description}${issueItem.file ? ` (${issueItem.file})` : ""}`);
-      }
+  // Feed non-approving review findings back even for a `comment` verdict: it does not block, but
+  // if validation failed and the loop runs again, the implementer should see them too.
+  if (review !== undefined && review.verdict !== "approve") {
+    feedbackParts.push(`REVIEW VERDICT: ${review.verdict}\n${review.summary}`);
+    for (const finding of review.findings) {
+      const location = finding.path !== null
+        ? ` (${finding.path}${finding.line !== null ? `:${finding.line}` : ""})`
+        : "";
+      feedbackParts.push(`  [${finding.severity}] ${finding.title}: ${finding.body}${location}`);
     }
   }
 
@@ -127,10 +150,24 @@ export default smithers((ctx) => {
         <Task id="fetch-issue" output={linearIssueSchema} agent={linearImplementAgents.fetchIssue}>
           <LinearFetchPrompt issueId={ctx.input.issueId} />
         </Task>
+        {/* Hard gate: refuse to plan/implement when the issue content was not actually
+            retrieved. Without this, a fetch-step auth failure returns its error text AS
+            the issue, and every downstream step faithfully implements the error message. */}
+        <Task id="fetch-gate" output={fetchGateSchema}>
+          {async () => {
+            if (issue === undefined || issue.fetched === false) {
+              throw new Error(
+                `Linear issue ${ctx.input.issueId} could not be fetched (${issue?.description || "no fetch output"}). ` +
+                  "Refusing to plan or implement from error text. Fix Linear MCP auth/availability and re-run.",
+              );
+            }
+            return { ok: true };
+          }}
+        </Task>
         <Task id="plan" output={planOutputSchema} agent={linearImplementAgents.plan}>
           <PlanPrompt prompt={planPrompt} />
         </Task>
-        <Loop id="impl:loop" until={done} maxIterations={2} onMaxReached="return-last">
+        <Loop id="impl:loop" until={done} maxIterations={clampIterations(ctx.input.maxIterations)} onMaxReached="return-last">
           <Sequence>
             <Task id="impl:implement" output={implementOutputSchema} agent={linearImplementAgents.implement} timeoutMs={1_800_000} heartbeatTimeoutMs={600_000}>
               <ImplementPrompt prompt={implementText} />
@@ -138,14 +175,20 @@ export default smithers((ctx) => {
             <Task id="impl:validate" output={validateOutputSchema} agent={linearImplementAgents.validate} timeoutMs={1_800_000} heartbeatTimeoutMs={600_000}>
               <ValidatePrompt prompt={implementPrompt} />
             </Task>
+            {/* A local review agent reads the working-tree diff and judges it against the
+                acceptance criteria. continueOnFail is load-bearing: the review is advisory, so a
+                crashed or malformed reviewer must never fail the build — it just leaves this
+                iteration with no review and validation decides alone (see the `done` computation). */}
             <Task
               id="impl:review"
-              output={reviewOutputSchema}
+              output={localReviewSchema}
               agent={linearImplementAgents.review}
               continueOnFail
               skipIf={ctx.input.skipAcceptanceReview}
+              timeoutMs={1_800_000}
+              heartbeatTimeoutMs={600_000}
             >
-              <AcceptanceReviewPrompt reviewer="reviewer-1" prompt={implementPrompt} />
+              <AcceptanceReviewPrompt prompt={implementPrompt} />
             </Task>
           </Sequence>
         </Loop>

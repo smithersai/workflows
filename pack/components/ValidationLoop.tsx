@@ -1,7 +1,6 @@
 /** @jsxImportSource smithers-orchestrator */
 import { Loop, Sequence, Task, type AgentLike } from "smithers-orchestrator";
 import { z } from "zod/v4";
-import { Review } from "~/components/Review";
 import ImplementPrompt from "~/prompts/implement.mdx";
 import ValidatePrompt from "~/prompts/validate.mdx";
 
@@ -22,11 +21,15 @@ export const validateOutputSchema = z.object({
   failingSummary: z.string().nullable().default(null),
 });
 
+/**
+ * A bare implement -> validate loop. Code review is NOT part of it: reviewing is a separate,
+ * schema-carrying step (see components/LocalReview.ts) that each workflow wires in itself, so the
+ * mechanical validation gate stays the only thing this component arbitrates on.
+ */
 export interface ValidationLoopProps {
   readonly idPrefix: string;
   readonly prompt: unknown;
   readonly implementAgents: AgentLike[];
-  readonly reviewAgents: AgentLike[];
   readonly validateAgents?: AgentLike[];
   readonly feedback?: string | null;
   readonly done?: boolean;
@@ -37,7 +40,6 @@ export function ValidationLoop({
   idPrefix,
   prompt,
   implementAgents,
-  reviewAgents,
   validateAgents,
   feedback,
   done = false,
@@ -59,7 +61,6 @@ export function ValidationLoop({
         <Task id={`${idPrefix}:validate`} output={validateOutputSchema} agent={validatorAgents} timeoutMs={1_800_000} heartbeatTimeoutMs={600_000}>
           <ValidatePrompt prompt={promptText} />
         </Task>
-        <Review idPrefix={`${idPrefix}:review`} prompt={promptText} agents={reviewAgents} />
       </Sequence>
     </Loop>
   );

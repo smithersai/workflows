@@ -17,6 +17,14 @@ Use the Linear MCP tools available to you (e.g. `linear` / `get_issue` / `list_c
 Do NOT write any code or make any repository changes. This is a read-only
 fetch step.
 
+IF THE FETCH FAILS — authentication error, issue not found, Linear MCP tools
+unavailable, or any other failure to retrieve the real issue content — you MUST
+return `fetched: false`, put the error message in `description`, and leave the
+other fields empty. NEVER put error text, placeholders, or invented content in
+`title`/`description`/`acceptanceCriteria` as if it were the issue: downstream
+steps treat those fields as the requirements to implement. Only return
+`fetched: true` when the content genuinely came from the Linear issue.
+
 REQUIRED OUTPUT:
 {props.schema}
 
