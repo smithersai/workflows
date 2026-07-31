@@ -1,7 +1,7 @@
 // smithers-source: authored
 // smithers-metadata-version: 1
 // smithers-display-name: Stack Push
-// smithers-description: Publish the next N built stack entries as stacked PRs (open + request review), and re-sync open PRs that a later amend re-flowed. NEVER merges.
+// smithers-description: Publish the next N built stack entries as stacked PRs, and re-sync open PRs that a later amend re-flowed. NEVER merges.
 // smithers-tags: github, stack, pr
 // smithers-aliases: spush
 /** @jsxImportSource smithers-orchestrator */
@@ -26,7 +26,6 @@ const inputSchema = z.object({
   count: z.number().int().default(5),
   repo: z.string().default(""),
   draft: z.boolean().default(true),
-  reviewers: z.array(z.string()).default(["claude", "codex"]),
 });
 
 const resyncSchema = z.object({
@@ -64,8 +63,6 @@ export default smithers((ctx) => {
     );
   }
 
-  const reviewers = ctx.input.reviewers ?? ["claude", "codex"];
-  const mention = reviewers.map((reviewer) => `@${reviewer}`).join(" ");
   const repo = ctx.input.repo || (repoKeys(map)[0] ?? "");
   const stale = staleEntries(map, repo);
   const newBatch = entriesToPush(map, repo, ctx.input.count);
@@ -85,7 +82,7 @@ export default smithers((ctx) => {
                 timeoutMs={900_000}
                 heartbeatTimeoutMs={300_000}
               >
-                <StackResyncPrompt branch={entry.branchName} prNumber={entry.prNumber ?? 0} reviewersMention={mention} />
+                <StackResyncPrompt branch={entry.branchName} prNumber={entry.prNumber ?? 0} />
               </Task>
               <Task
                 id={`push:resync-record:${entry.issueId}`}
@@ -123,7 +120,7 @@ export default smithers((ctx) => {
                 timeoutMs={900_000}
                 heartbeatTimeoutMs={300_000}
               >
-                <PrOpenPrompt branch={entry.branchName} base={base} title={title} body={body} draft={ctx.input.draft} reviewersMention={mention} />
+                <PrOpenPrompt branch={entry.branchName} base={base} title={title} body={body} draft={ctx.input.draft} />
               </Task>
               <Task
                 id={`push:open-record:${entry.issueId}`}

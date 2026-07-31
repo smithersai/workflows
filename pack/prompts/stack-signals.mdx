@@ -1,0 +1,60 @@
+# Read the Stack's CI Status and Human Comments
+
+Report the current state of every open PR in this stacked feature on the two signals only GitHub
+can supply: **status checks** and **review comments left by humans**. This is a read-only step — do
+NOT modify code, do NOT comment, do NOT wait or poll, and NEVER merge.
+
+Code review itself is not your job and is not happening here: it is done locally before each branch
+is pushed. Do not review any diff, and do not invent findings of your own.
+
+PRs in this stack (bottom → top, JSON — each has `prNumber` and `branch`):
+{props.prs}
+
+## Gather
+
+Resolve `owner/repo` once with `gh repo view --json nameWithOwner -q .nameWithOwner`, then take a
+single snapshot per PR. No sleeping, no watching, no retry loop:
+
+- `gh pr checks <pr>` — status checks (a non-zero exit just means red/pending)
+- `gh api repos/{owner}/{repo}/pulls/<pr>/reviews` — formal reviews
+- `gh api repos/{owner}/{repo}/pulls/<pr>/comments` — inline review (diff) comments
+- `gh api repos/{owner}/{repo}/issues/<pr>/comments` — issue / conversation comments
+
+Emit one entry per PR in `prs`, echoing its `prNumber` and `branch`.
+
+## Classify CI (per PR)
+
+Set that PR's `ci` from the checks on its current head (`headRefOid`):
+
+- `passing` — every check concluded successfully.
+- `failing` — at least one check concluded in failure, error, timeout, or cancellation.
+- `pending` — no failures yet, but at least one check is still queued or running.
+- `none` — that PR has no status checks at all.
+
+For each failing check add one finding with `source: "ci"`, `origin` set to the check name, and a
+`body` quoting the actual failure — the failing test, the compiler/lint error, the assertion — not
+just "CI is red". Pull detail from the run log (`gh run view <id> --log-failed`) when the summary is
+not specific enough. Set `path` only when the failure names a specific file.
+
+## Classify human comments (per PR)
+
+A **human** comment is one from a real user account — not an app/bot account (a `[bot]` suffix or
+`type: "Bot"`). Ignore bot comments entirely; no bot review is expected on these PRs.
+
+For each human comment or review raising something still unresolved at that PR's current head, add
+a finding with `source: "human"`, `origin` set to their login, `path` when the comment is anchored
+to a file, and the comment text as `body`. Judge "unresolved" against the **actual current code**,
+not GitHub's resolved/unresolved thread flag. Comments authored before the PR's current head were
+likely already addressed by a later push — verify against the code before re-raising one. A plain
+approval or an unqualified "looks good" is not a finding.
+
+## Verdict
+
+Set `clean: true` ONLY when, across ALL PRs, every `ci` is `passing` or `none` AND there are no
+findings anywhere. Anything else — red or still-running checks on any PR, or one unaddressed human
+comment — is `clean: false`.
+
+REQUIRED OUTPUT:
+{props.schema}
+
+Return ONLY raw JSON matching the required output schema.

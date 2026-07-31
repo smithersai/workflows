@@ -1,8 +1,8 @@
 // smithers-source: authored
 // smithers-metadata-version: 1
 // smithers-display-name: PR Review Loop
-// smithers-description: Open or attach to a PR, trigger AI review, fix findings, and stop when reviewers approve. NEVER merges.
-// smithers-tags: github, review, pr
+// smithers-description: Open or attach to a PR, read its CI status and human review comments, address what they raise, and report. NEVER merges.
+// smithers-tags: github, review, pr, ci
 // smithers-aliases: prl
 /** @jsxImportSource smithers-orchestrator */
 import { createSmithers, Loop } from "smithers-orchestrator";
@@ -11,14 +11,12 @@ import { agents } from "../agents";
 import {
   addressFindingsSchema,
   prOpenSchema,
-  rerequestSchema,
-  reviewStateSchema,
+  prSignalsSchema,
 } from "../components/PrReview";
 import PrAddressFindingsPrompt from "../prompts/pr-address-findings.mdx";
 import PrAttachPrompt from "../prompts/pr-attach.mdx";
-import PrAwaitReviewsPrompt from "../prompts/pr-await-reviews.mdx";
 import PrOpenPrompt from "../prompts/pr-open.mdx";
-import PrRerequestPrompt from "../prompts/pr-rerequest.mdx";
+import PrSignalsPrompt from "../prompts/pr-signals.mdx";
 
 const issueContextSchema = z.object({
   key: z.string().default(""),
@@ -32,10 +30,11 @@ const inputSchema = z.object({
   branch: z.string().default(""),
   base: z.string().default("main"),
   issueContext: issueContextSchema.optional(),
-  reviewers: z.array(z.string()).default(["claude", "codex"]),
-  maxRounds: z.number().int().default(4),
-  pollIntervalSec: z.number().int().default(60),
-  maxAttempts: z.number().int().default(30),
+  // Deliberately low. Code review happens locally before the PR exists, so the only things left
+  // to chase here are CI and a human comment — both of which a human ultimately drives. Two
+  // rounds is enough to fix a red build and confirm the fix; anything beyond that is a person's
+  // call, not a loop's.
+  maxRounds: z.number().int().default(2),
 });
 
 const reportSchema = z.object({
@@ -48,30 +47,25 @@ const reportSchema = z.object({
 const { Workflow, Task, Sequence, smithers } = createSmithers({
   input: inputSchema,
   prOpen: prOpenSchema,
-  reviewState: reviewStateSchema,
+  signals: prSignalsSchema,
   addressFindings: addressFindingsSchema,
-  rerequest: rerequestSchema,
   report: reportSchema,
 });
 
 export default smithers((ctx) => {
   const base = ctx.input.base || "main";
-  const reviewers = ctx.input.reviewers ?? ["claude", "codex"];
-  const maxRounds = ctx.input.maxRounds ?? 4;
-  const pollIntervalSec = ctx.input.pollIntervalSec ?? 60;
-  const maxAttempts = ctx.input.maxAttempts ?? 20;
+  const maxRounds = ctx.input.maxRounds ?? 2;
   const branch = ctx.input.branch || "(current branch)";
   const issue = ctx.input.issueContext;
-  const mention = reviewers.map((reviewer) => `@${reviewer}`).join(" ");
 
   const prTitle = issue?.title ? `${issue.key ? issue.key + ": " : ""}${issue.title}` : `Changes on ${branch}`;
-  const prBody = [
+  const prBodyParts = [
     issue?.url ? `Linear issue: ${issue.url}` : null,
     issue?.acceptanceCriteria.length
       ? `Acceptance criteria:\n${issue.acceptanceCriteria.map((criterion) => `- [ ] ${criterion}`).join("\n")}`
       : null,
-    "Automated implementation, under AI review.",
-  ].filter((part): part is string => part !== null).join("\n\n");
+  ].filter((part): part is string => part !== null);
+  const prBody = prBodyParts.length > 0 ? prBodyParts.join("\n\n") : `Changes on \`${branch}\`.`;
 
   const attachToExisting = ctx.input.prNumber !== undefined;
   const prOpen =
@@ -79,45 +73,39 @@ export default smithers((ctx) => {
     ctx.outputMaybe("prOpen", { nodeId: "attach-pr" });
   const prNumber = prOpen?.prNumber ?? ctx.input.prNumber ?? 0;
 
-  const latestReview = ctx.latest("reviewState", "rev:await");
-  const latestFix = ctx.latest("addressFindings", "rev:fix");
-  const currentHeadSha = latestFix?.headSha || prOpen?.headSha || "";
-
-  const openFindings = (latestReview?.reviewers ?? [])
-    .filter((reviewer) => reviewer.status === "findings")
-    .flatMap((reviewer) => reviewer.findings.map((finding) => ({ reviewer: reviewer.name, path: finding.path, body: finding.body })));
+  const latestSignals = ctx.latest("signals", "rev:signals");
+  const openFindings = latestSignals?.findings ?? [];
   const hasOpenFindings = openFindings.length > 0;
-  const done = latestReview?.allResolved === true;
-  // A timed-out poll must NOT discard real findings: fix whenever there are open
-  // findings, regardless of timedOut. Skip only when there is genuinely nothing to fix
-  // (no review yet, everything resolved, or no open findings — e.g. reviewers still pending).
-  const skipFix = latestReview === undefined || latestReview.allResolved || !hasOpenFindings;
-  const addressed = latestFix?.addressed ?? [];
-  const skipped = latestFix?.skipped ?? [];
+  const done = latestSignals?.clean === true;
+  // Skip the fix step when there is genuinely nothing to fix: no snapshot yet, everything already
+  // clean, or checks still running with nothing red and no comment to answer. Note that `clean`
+  // being false is NOT sufficient reason to run a fix — pending CI alone leaves nothing to do.
+  const skipFix = latestSignals === undefined || latestSignals.clean || !hasOpenFindings;
+
+  const latestFix = ctx.latest("addressFindings", "rev:fix");
+  const ciStatus = latestSignals?.ci ?? "none";
 
   return (
     <Workflow name="pr-review-loop">
       <Sequence>
         <Task id="open-pr" output={prOpenSchema} agent={agents.autonomous} skipIf={attachToExisting} timeoutMs={900_000} heartbeatTimeoutMs={300_000}>
-          <PrOpenPrompt branch={branch} base={base} title={prTitle} body={prBody} draft={false} reviewersMention={mention} />
+          <PrOpenPrompt branch={branch} base={base} title={prTitle} body={prBody} draft={false} />
         </Task>
 
         <Task id="attach-pr" output={prOpenSchema} agent={agents.autonomous} skipIf={!attachToExisting} timeoutMs={300_000} heartbeatTimeoutMs={120_000}>
-          <PrAttachPrompt prNumber={ctx.input.prNumber ?? 0} reviewersMention={mention} />
+          <PrAttachPrompt prNumber={ctx.input.prNumber ?? 0} />
         </Task>
 
         <Loop id="rev:loop" until={done} maxIterations={maxRounds} onMaxReached="return-last">
           <Sequence>
-            <Task id="rev:await" output={reviewStateSchema} agent={agents.autonomous} timeoutMs={2_400_000} heartbeatTimeoutMs={600_000}>
-              <PrAwaitReviewsPrompt prNumber={prNumber} reviewers={reviewers.join(", ")} headSha={currentHeadSha} pollIntervalSec={pollIntervalSec} maxAttempts={maxAttempts} />
+            {/* One snapshot per round — read-only, and explicitly NOT a poll: nothing here waits
+                on a remote reviewer, so a step that returns "pending" simply ends the round. */}
+            <Task id="rev:signals" output={prSignalsSchema} agent={agents.autonomous} timeoutMs={600_000} heartbeatTimeoutMs={300_000}>
+              <PrSignalsPrompt prNumber={prNumber} />
             </Task>
 
             <Task id="rev:fix" output={addressFindingsSchema} agent={agents.smart} skipIf={skipFix} timeoutMs={1_800_000} heartbeatTimeoutMs={600_000}>
               <PrAddressFindingsPrompt prNumber={prNumber} findings={JSON.stringify(openFindings, null, 2)} />
-            </Task>
-
-            <Task id="rev:rerequest" output={rerequestSchema} agent={agents.autonomous} skipIf={skipFix} timeoutMs={900_000} heartbeatTimeoutMs={300_000}>
-              <PrRerequestPrompt prNumber={prNumber} reviewersMention={mention} addressed={JSON.stringify(addressed, null, 2)} skipped={JSON.stringify(skipped, null, 2)} />
             </Task>
           </Sequence>
         </Loop>
@@ -125,10 +113,11 @@ export default smithers((ctx) => {
         <Task id="rev:report" output={reportSchema} agent={agents.autonomous} timeoutMs={600_000}>
           {[
             `Report the final state of PR #${prNumber} (${prOpen?.prUrl ?? "unknown URL"}).`,
+            `Status checks: ${ciStatus}. Open findings: ${openFindings.length}. Fixes pushed this run: ${latestFix?.addressed.length ?? 0}; deliberately skipped: ${latestFix?.skipped.length ?? 0}.`,
             done
-              ? "All reviewers have approved with no open findings. State that the PR is ready for a HUMAN to merge. Do NOT merge it yourself."
-              : `Reviewers are NOT all resolved (timed out or hit the ${maxRounds}-round limit). Use \`smithers ask-human\` to escalate: explain which reviewers are still pending or have open findings, and ask whether to continue, stop, or have a human take over. Do NOT merge the PR.`,
-            "Set resolved appropriately, list pending reviewers, and give a concise summary.",
+              ? "Checks are green and no human comment is outstanding. State that the PR is ready for a HUMAN to review and merge. Do NOT merge it yourself."
+              : `Not clean (checks are ${ciStatus}, or a human comment is outstanding, or it hit the ${maxRounds}-round cap). Say plainly what is still open and who needs to act. Do NOT merge the PR.`,
+            "Set `resolved` appropriately, list what is still pending in `pending`, and give a concise summary.",
           ].join("\n\n")}
         </Task>
       </Sequence>

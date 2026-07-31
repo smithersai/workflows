@@ -1,19 +1,21 @@
-# Address PR Review Findings
+# Address PR Findings
 
-Reviewers left findings on pull request **#{props.prNumber}**. Resolve them on
-the PR branch.
+Pull request **#{props.prNumber}** has open findings — failing status checks and/or unresolved
+comments from human reviewers. Resolve them on the PR branch.
 
-Findings to address (JSON):
+Findings to address (JSON; each has a `source` of `ci` or `human`, an `origin`, an optional `path`,
+and a `body`):
 {props.findings}
 
 For each finding:
 
-- If it is valid, fix it properly in the code (not a superficial patch), and add
-  or update a meaningful test when the finding concerns behavior.
-- If you deliberately do NOT act on a finding (you disagree, it's out of scope,
-  or it's a false positive), do not change code for it — instead record it in
-  `skipped` with a clear, honest `reason`. The reason will be posted back to the
-  reviewers, so make it defensible.
+- **`ci`** — reproduce the failure locally, fix the underlying cause, and confirm the same command
+  now passes. Do not paper over it by disabling, skipping, or loosening the check.
+- **`human`** — if it is valid, fix it properly in the code (not a superficial patch), and add or
+  update a meaningful test when the finding concerns behavior.
+- If you deliberately do NOT act on a finding (you disagree, it's out of scope, or it's a false
+  positive), do not change code for it — instead record it in `skipped` with a clear, honest
+  `reason`. A human will read those reasons, so make each one defensible.
 
 After fixing:
 
@@ -23,7 +25,7 @@ After fixing:
 4. Capture the new head SHA (`git rev-parse HEAD`).
 
 ABSOLUTE RULE: Do NOT merge the PR. Never run `gh pr merge`, never enable
-auto-merge.
+auto-merge. Do NOT post comments on the PR and do NOT tag anyone.
 
 ANONYMITY: Never name the tooling behind this work in the commit message or anywhere else others
 will see it — no `xiv`, no `smithers`, no internal workflow or command names. It's a private

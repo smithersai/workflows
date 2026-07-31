@@ -1,18 +1,13 @@
 # Attach to Existing Pull Request
 
-Attach to the **already-open** pull request **#{props.prNumber}** and trigger AI review.
+Attach to the **already-open** pull request **#{props.prNumber}**. This step is read-only.
 
-Steps (use `gh` / `git`):
+Read the PR to confirm it exists and is open, and capture its URL and head SHA:
+`gh pr view {props.prNumber} --json number,url,headRefOid,state`.
+If it is not open, stop and report the problem — do not create a new PR.
 
-1. Read the PR to confirm it exists and is open, and capture its URL and head SHA:
-   `gh pr view {props.prNumber} --json number,url,headRefOid,state`.
-   If it is not open, stop and report the problem — do not create a new PR.
-2. Post the review-trigger comment on PR #{props.prNumber} with `gh pr comment`.
-   The comment body MUST be exactly (interpolated handles, do not alter):
-   {props.reviewersMention} review
-
-Do NOT create a new PR, do NOT push code, and NEVER merge (`gh pr merge` is forbidden).
-Posting the trigger comment is the only mutating action.
+Do NOT create a new PR, do NOT push code, do NOT post a comment, do NOT request reviewers, and
+NEVER merge (`gh pr merge` is forbidden). Reading the PR is the only action.
 
 Report the PR number, URL, and head SHA.
 

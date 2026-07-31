@@ -1,7 +1,7 @@
 // smithers-source: authored
 // smithers-metadata-version: 1
 // smithers-display-name: PR Fix
-// smithers-description: Address the existing review findings on a PR once and push — no loop, no re-request. NEVER merges.
+// smithers-description: Address the existing review findings on a PR once and push — no loop, nothing posted back. NEVER merges.
 // smithers-tags: github, review, pr, fix
 // smithers-aliases: prf
 /** @jsxImportSource smithers-orchestrator */

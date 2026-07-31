@@ -1,20 +1,21 @@
 # Re-sync a Re-flowed PR
 
 Branch **{props.branch}** (open as PR **#{props.prNumber}**) was re-flowed by a stack amend
-and now has new local commits. Update the open PR to match and ask for re-review.
+and now has new local commits. Update the open PR to match.
 
 Steps (use `git` and `gh` directly):
 
 1. Force-push the rewritten branch safely:
    `git push --force-with-lease origin {props.branch}`.
-2. Post one re-review comment on PR #{props.prNumber} with `gh pr comment`.
-   The comment body MUST be exactly (interpolated handles, do not alter):
-   {props.reviewersMention} re-review — re-flowed from an upstream stack amend; please re-review.
+2. Confirm the PR now points at the new head:
+   `gh pr view {props.prNumber} --json headRefOid,state`.
 
 Then capture the new head SHA: `git rev-parse {props.branch}`.
 
+Force-pushing is the only action. Do NOT post a comment, do NOT request reviewers, and do NOT tag
+anyone — the force-push already tells GitHub the PR changed.
+
 ABSOLUTE RULE: Do NOT merge the PR. Never run `gh pr merge`, never enable auto-merge.
-Force-pushing and commenting are the only actions.
 
 REQUIRED OUTPUT:
 {props.schema}

@@ -1,20 +1,19 @@
 import { z } from "zod/v4";
-import { reviewerStateSchema } from "./PrReview";
+import { ciStatusSchema, prFindingSchema } from "./PrReview";
 
-/** One PR's reviewer state within the stack (reuses PrReview's per-reviewer shape). */
-export const prReviewSchema = z.object({
+/** One PR's GitHub-only signals within the stack (reuses PrReview's CI + finding shapes). */
+export const stackPrSignalsSchema = z.object({
   prNumber: z.number().int(),
   branch: z.string(),
-  reviewers: z.array(reviewerStateSchema).default([]),
+  ci: ciStatusSchema.default("none"),
+  findings: z.array(prFindingSchema).default([]),
 });
 
-/** Stack-wide await output: the review state of every PR in the stack. */
-export const stackReviewStateSchema = z.object({
-  prs: z.array(prReviewSchema).default([]),
-  /** True only when no PR has a `pending` or `findings` reviewer left. */
-  allResolved: z.boolean().default(false),
-  /** True if polling hit the attempt cap with an expected reviewer still pending. */
-  timedOut: z.boolean().default(false),
+/** Stack-wide signal sweep: the CI + human-comment state of every open PR in the stack. */
+export const stackSignalsSchema = z.object({
+  prs: z.array(stackPrSignalsSchema).default([]),
+  /** True only when every PR has green (or absent) checks and no unaddressed human comment. */
+  clean: z.boolean().default(false),
 });
 
 /** Result of the jj-cascade address step. */
@@ -36,18 +35,13 @@ export const stackAddressSchema = z.object({
   pushedBranches: z.array(z.string()).default([]),
 });
 
-export const stackRerequestSchema = z.object({
-  rerequested: z
-    .array(z.object({ pr: z.number().int(), commentUrl: z.string().default("") }))
-    .default([]),
-});
-
 export const stackReviewReportSchema = z.object({
   resolved: z.boolean().default(false),
   pending: z.array(z.string()).default([]),
   summary: z.string(),
 });
 
-export type PrReviewState = z.infer<typeof prReviewSchema>;
-export type StackReviewState = z.infer<typeof stackReviewStateSchema>;
+export type StackPrSignals = z.infer<typeof stackPrSignalsSchema>;
+export type StackSignals = z.infer<typeof stackSignalsSchema>;
 export type StackAddress = z.infer<typeof stackAddressSchema>;
+export type StackReviewReport = z.infer<typeof stackReviewReportSchema>;

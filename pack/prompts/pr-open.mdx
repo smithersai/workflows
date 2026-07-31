@@ -1,7 +1,7 @@
 # Open Pull Request
 
 Open a GitHub pull request for the work on branch **{props.branch}** against
-base **{props.base}**, then trigger AI review.
+base **{props.base}**.
 
 Steps (use `git` and `gh` directly):
 
@@ -16,19 +16,20 @@ Steps (use `git` and `gh` directly):
 {props.body}
 
      Append a trailer line: `🤖 Generated with Claude Code`.
-3. Immediately post a review-trigger comment on the new PR with `gh pr comment`.
-   The comment body MUST be exactly (interpolated handles, do not alter):
-   {props.reviewersMention} review
 
 Then capture the PR number, URL, and current head SHA
 (`git rev-parse HEAD`).
 
-ABSOLUTE RULE: Do NOT merge the PR. Never run `gh pr merge`, never enable
-auto-merge. Creating and commenting only.
+Creating the PR is the whole job. Do NOT request reviewers, do NOT post a comment on the PR, and do
+NOT tag anyone — the change was already reviewed locally, and a human decides who looks at it from
+here.
 
-ANONYMITY: Never name the tooling behind this work in the PR title, body, review-trigger
-comment, or anywhere else others will see it — no `xiv`, no `smithers`, no internal workflow or
-command names. It's a private internal tool; the PR must read as ordinary human-authored work.
+ABSOLUTE RULE: Do NOT merge the PR. Never run `gh pr merge`, never enable
+auto-merge.
+
+ANONYMITY: Never name the tooling behind this work in the PR title, body, or anywhere else others
+will see it — no `xiv`, no `smithers`, no internal workflow or command names. It's a private
+internal tool; the PR must read as ordinary human-authored work.
 
 REQUIRED OUTPUT:
 {props.schema}
