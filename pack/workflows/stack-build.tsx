@@ -28,6 +28,8 @@ const inputSchema = z.object({
   // Per-run override from the CLI. ORs with the map's plan-time default below —
   // a flag can force skipping on, but never re-enables review on a map that opted out.
   skipAcceptanceReview: z.boolean().default(false),
+  // Forwarded to every entry's linear-implement subflow.
+  maxIterations: z.number().int().default(3),
 });
 
 const ackSchema = z.object({
@@ -94,7 +96,7 @@ export default smithers((ctx) => {
               <SubflowLoose
                 id={`build:impl:${entry.issueId}`}
                 workflow={linearImplement}
-                input={{ issueId: entry.issueId, skipAcceptanceReview }}
+                input={{ issueId: entry.issueId, skipAcceptanceReview, maxIterations: ctx.input.maxIterations }}
                 output={outputs.impl}
                 skipIf={done}
               />

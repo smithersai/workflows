@@ -22,6 +22,8 @@ export interface ImplementCommand {
   readonly tdd: boolean;
   /** Skip the local acceptance-review step; validation (tests/lint/typecheck) still gates the loop. */
   readonly skipAcceptanceReview: boolean;
+  /** implement→validate→review passes allowed before returning the last attempt. */
+  readonly maxIterations: number;
 }
 
 export interface ReviewCommand {
@@ -36,6 +38,8 @@ export interface ShipCommand {
   readonly tdd: boolean;
   /** Skip the local acceptance-review step; validation (tests/lint/typecheck) still gates the loop. */
   readonly skipAcceptanceReview: boolean;
+  /** implement→validate→review passes allowed before returning the last attempt. */
+  readonly maxIterations: number;
 }
 
 export function smithersBin(root: AbsolutePath): AbsolutePath {
@@ -68,7 +72,12 @@ function ensurePackInstalled(packRoot: AbsolutePath): void {
 }
 
 export function implementInput(command: ImplementCommand): Record<string, unknown> {
-  return { issueId: command.issueId, tdd: command.tdd, skipAcceptanceReview: command.skipAcceptanceReview };
+  return {
+    issueId: command.issueId,
+    tdd: command.tdd,
+    skipAcceptanceReview: command.skipAcceptanceReview,
+    maxIterations: command.maxIterations,
+  };
 }
 
 export function reviewInput(command: ReviewCommand): Record<string, unknown> {
@@ -84,6 +93,7 @@ export function shipInput(command: ShipCommand): Record<string, unknown> {
     base: command.base,
     tdd: command.tdd,
     skipAcceptanceReview: command.skipAcceptanceReview,
+    maxIterations: command.maxIterations,
   };
 }
 
@@ -124,12 +134,15 @@ export interface StackBuildCommand {
   readonly repo?: RepoKey;
   /** Per-run override: skip the local acceptance-review step. ORs with the map's feature-level default. */
   readonly skipAcceptanceReview: boolean;
+  /** Forwarded to every entry's implement subflow. */
+  readonly maxIterations: number;
 }
 
 export function stackBuildInput(command: StackBuildCommand): Record<string, unknown> {
   const input: Record<string, unknown> = {
     stackMapPath: command.stackMapPath,
     skipAcceptanceReview: command.skipAcceptanceReview,
+    maxIterations: command.maxIterations,
   };
   if (command.repo !== undefined) input.repo = command.repo;
   return input;
@@ -176,15 +189,10 @@ export interface StackReviewCommand {
   readonly stackMapPath: AbsolutePath;
   /** Review only this repo's substack. Omit for a single-repo stack. */
   readonly repo?: RepoKey;
-  /** Reviewer handles to poll and re-request (e.g. ["claude", "codex"]). */
-  readonly reviewers: readonly string[];
 }
 
 export function stackReviewInput(command: StackReviewCommand): Record<string, unknown> {
-  const input: Record<string, unknown> = {
-    stackMapPath: command.stackMapPath,
-    reviewers: command.reviewers,
-  };
+  const input: Record<string, unknown> = { stackMapPath: command.stackMapPath };
   if (command.repo !== undefined) input.repo = command.repo;
   return input;
 }

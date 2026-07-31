@@ -1,7 +1,7 @@
 // smithers-source: authored
 // smithers-metadata-version: 1
 // smithers-display-name: Linear to PR
-// smithers-description: Implement a Linear issue, then open a PR and drive it through review until all reviewers approve. NEVER merges.
+// smithers-description: Implement a Linear issue (with a local review pass), then open a PR and settle its CI status and human comments. NEVER merges.
 // smithers-tags: linear, github, coding, review
 // smithers-aliases: l2pr
 /** @jsxImportSource smithers-orchestrator */
@@ -18,6 +18,8 @@ const inputSchema = z.object({
   tdd: z.boolean().default(false),
   // Forwarded to linear-implement: skip its acceptance-review step (validation still gates).
   skipAcceptanceReview: z.boolean().default(false),
+  // Forwarded to linear-implement: implement→validate→review passes before giving up.
+  maxIterations: z.number().int().default(3),
 });
 
 const prResultSchema = z.looseObject({
@@ -50,6 +52,7 @@ export default smithers((ctx) => {
             issueId: ctx.input.issueId,
             tdd: ctx.input.tdd,
             skipAcceptanceReview: ctx.input.skipAcceptanceReview,
+            maxIterations: ctx.input.maxIterations,
           }}
           output={outputs.implResult}
         />

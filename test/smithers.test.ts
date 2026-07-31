@@ -14,15 +14,17 @@ import {
 
 describe("workflow input builders", () => {
   test("builds implement input", () => {
-    expect(implementInput({ issueId: "ENG-123", tdd: true, skipAcceptanceReview: false })).toEqual({
+    expect(implementInput({ issueId: "ENG-123", tdd: true, skipAcceptanceReview: false, maxIterations: 3 })).toEqual({
       issueId: "ENG-123",
       tdd: true,
       skipAcceptanceReview: false,
+      maxIterations: 3,
     });
-    expect(implementInput({ issueId: "ENG-123", tdd: false, skipAcceptanceReview: true })).toEqual({
+    expect(implementInput({ issueId: "ENG-123", tdd: false, skipAcceptanceReview: true, maxIterations: 1 })).toEqual({
       issueId: "ENG-123",
       tdd: false,
       skipAcceptanceReview: true,
+      maxIterations: 1,
     });
   });
 
@@ -41,11 +43,14 @@ describe("workflow input builders", () => {
   });
 
   test("builds ship input", () => {
-    expect(shipInput({ issueId: "ENG-123", base: "main", tdd: false, skipAcceptanceReview: true })).toEqual({
+    expect(
+      shipInput({ issueId: "ENG-123", base: "main", tdd: false, skipAcceptanceReview: true, maxIterations: 5 }),
+    ).toEqual({
       issueId: "ENG-123",
       base: "main",
       tdd: false,
       skipAcceptanceReview: true,
+      maxIterations: 5,
     });
   });
 
@@ -71,14 +76,18 @@ describe("workflow input builders", () => {
   });
 
   test("builds stack build input, with and without a repo scope", () => {
-    expect(stackBuildInput({ stackMapPath: "/p/checkout.json", skipAcceptanceReview: false })).toEqual({
+    expect(stackBuildInput({ stackMapPath: "/p/checkout.json", skipAcceptanceReview: false, maxIterations: 3 })).toEqual({
       stackMapPath: "/p/checkout.json",
       skipAcceptanceReview: false,
+      maxIterations: 3,
     });
-    expect(stackBuildInput({ stackMapPath: "/p/checkout.json", repo: "api", skipAcceptanceReview: true })).toEqual({
+    expect(
+      stackBuildInput({ stackMapPath: "/p/checkout.json", repo: "api", skipAcceptanceReview: true, maxIterations: 2 }),
+    ).toEqual({
       stackMapPath: "/p/checkout.json",
       repo: "api",
       skipAcceptanceReview: true,
+      maxIterations: 2,
     });
   });
 
@@ -112,13 +121,11 @@ describe("workflow input builders", () => {
   });
 
   test("builds stack review input, with and without a repo scope", () => {
-    expect(stackReviewInput({ stackMapPath: "/p/checkout.json", reviewers: ["claude", "codex"] })).toEqual({
+    expect(stackReviewInput({ stackMapPath: "/p/checkout.json" })).toEqual({
       stackMapPath: "/p/checkout.json",
-      reviewers: ["claude", "codex"],
     });
-    expect(stackReviewInput({ stackMapPath: "/p/checkout.json", repo: "web", reviewers: ["claude"] })).toEqual({
+    expect(stackReviewInput({ stackMapPath: "/p/checkout.json", repo: "web" })).toEqual({
       stackMapPath: "/p/checkout.json",
-      reviewers: ["claude"],
       repo: "web",
     });
   });

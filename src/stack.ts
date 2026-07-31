@@ -399,6 +399,7 @@ export async function runStackBuild(
     readonly allRepos: boolean;
     readonly detach: boolean;
     readonly skipAcceptanceReview: boolean;
+    readonly maxIterations: number;
   },
 ): Promise<void> {
   const { path, map } = await requireStackMap(context);
@@ -411,7 +412,12 @@ export async function runStackBuild(
       smithersHome: context.smithersHome,
       targetCwd: config.path,
       workflow: "stack-build",
-      input: stackBuildInput({ stackMapPath: path, repo, skipAcceptanceReview: options.skipAcceptanceReview }),
+      input: stackBuildInput({
+        stackMapPath: path,
+        repo,
+        skipAcceptanceReview: options.skipAcceptanceReview,
+        maxIterations: options.maxIterations,
+      }),
       detach: options.allRepos ? true : options.detach,
     });
   }
@@ -441,7 +447,6 @@ export async function runStackReview(
   options: {
     readonly repo?: RepoKey;
     readonly allRepos: boolean;
-    readonly reviewers: readonly string[];
     readonly detach: boolean;
   },
 ): Promise<void> {
@@ -455,7 +460,7 @@ export async function runStackReview(
       smithersHome: context.smithersHome,
       targetCwd: config.path,
       workflow: "stack-review",
-      input: stackReviewInput({ stackMapPath: path, repo, reviewers: options.reviewers }),
+      input: stackReviewInput({ stackMapPath: path, repo }),
       detach: options.allRepos ? true : options.detach,
     });
   }

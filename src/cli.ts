@@ -5,8 +5,9 @@ import { BunContext, BunRuntime } from "@effect/platform-bun";
 import { Console, Effect, Option } from "effect";
 import { currentBranchPrNumber } from "./github";
 import { howToGuide } from "./howto";
-import { installPack } from "./manifest";
-import { defaultSmithersHome, packagedPackRoot } from "./paths";
+import { installPack, installSkills } from "./manifest";
+import { defaultTrueFlag } from "./options";
+import { defaultSmithersHome, packagedPackRoot, packagedSkillsRoot } from "./paths";
 import { runPrReview } from "./pr-review";
 import {
   checkDevWorkflow,
@@ -48,6 +49,16 @@ const skipAcceptanceReviewFlag = Options.boolean("skip-acceptance-review").pipe(
   Options.withDescription(
     "Skip the local acceptance-review step of the implement loop; validation (tests/lint/typecheck) still gates. On `stack plan` this is recorded in the stack map as the feature-wide default; on `implement`/`ship`/`stack build` it applies to that run and ORs with the map default.",
   ),
+);
+const skillsFlag = defaultTrueFlag(
+  "skills",
+  "Also install this repo's skills, prompting for which agents to install into. Default true; pass --no-skills to update the workflow pack alone.",
+);
+const maxIterationsOption = Options.integer("max-iterations").pipe(
+  Options.withDescription(
+    "How many implement→validate→review passes an issue may take before the run returns its last attempt. Raising this only costs anything for issues that actually fail a pass. Clamped to 1-10.",
+  ),
+  Options.withDefault(3),
 );
 const baseOption = Options.text("base").pipe(
   Options.withDescription("Base branch for a newly opened pull request."),
@@ -91,13 +102,9 @@ const countOption = Options.integer("count").pipe(
   Options.withDescription("How many built-but-unpublished entries to publish this batch."),
   Options.withDefault(5),
 );
-const reviewersOption = Options.text("reviewers").pipe(
-  Options.withDescription("Comma-separated reviewer handles to poll and re-request (default: claude,codex)."),
-  Options.withDefault("claude,codex"),
-);
-const draftOption = Options.boolean("draft").pipe(
-  Options.withDescription("Open each PR as a draft. Default true; pass --no-draft to open ready-for-review PRs."),
-  Options.withDefault(true),
+const draftOption = defaultTrueFlag(
+  "draft",
+  "Open each PR as a draft. Default true; pass --no-draft to open ready-for-review PRs.",
 );
 const jsonOption = Options.boolean("json").pipe(
   Options.withDescription("Emit the triage report as JSON for an operator agent to parse."),
@@ -157,7 +164,7 @@ function smithersHome(): string {
   return defaultSmithersHome();
 }
 
-function runInstallCommand(): Effect.Effect<void, unknown> {
+function runInstallCommand(options: { readonly skills: boolean }): Effect.Effect<void, unknown> {
   return toEffect(async () => {
     const result = await installPack({
       packRoot: packagedPackRoot(),
@@ -165,6 +172,22 @@ function runInstallCommand(): Effect.Effect<void, unknown> {
       runInstall: true,
     });
     console.log(`Installed ${result.copied} managed files to ${result.smithersHome}. Backups: ${result.backups}.`);
+
+    if (!options.skills) {
+      console.log("Skipped skills (--no-skills). Agents will keep whatever skills they already have.");
+      return;
+    }
+    // The pack is already installed at this point, and it is the half that matters for running
+    // workflows. A skills failure (offline, npx unavailable, registry hiccup) must therefore
+    // degrade to a warning rather than taking the pack update down with it.
+    try {
+      await installSkills({ skillsRoot: packagedSkillsRoot(), global: true });
+      console.log("Installed skills from this working tree.");
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      console.warn(`Pack updated, but installing skills failed: ${detail}`);
+      console.warn(`Re-run just the skills step with: npx skills@latest add ${packagedSkillsRoot()} --skill '*' --global`);
+    }
   });
 }
 
@@ -201,20 +224,29 @@ const howTo = Command.make("how-to", {}, () => Console.log(howToGuide())).pipe(
   Command.withDescription("Print the orchestration runbook: how to drive a Linear feature to completion with `xiv stack`."),
 );
 
-const init = Command.make("init", {}, runInstallCommand).pipe(
-  Command.withDescription("Install the managed Smithers workflow pack into SMITHERS_HOME."),
+const init = Command.make("init", { skills: skillsFlag }, runInstallCommand).pipe(
+  Command.withDescription(
+    "Install the managed Smithers workflow pack into SMITHERS_HOME, and this repo's skills into your agent directories. --no-skills for the pack only.",
+  ),
 );
-const update = Command.make("update", {}, runInstallCommand).pipe(
-  Command.withDescription("Update managed pack files, backing up local drift before overwrite."),
+const update = Command.make("update", { skills: skillsFlag }, runInstallCommand).pipe(
+  Command.withDescription(
+    "Update managed pack files (backing up local drift before overwrite) and reinstall this repo's skills. --no-skills for the pack only.",
+  ),
 );
 
 const implement = Command.make(
   "implement",
-  { issueId: issueIdArg, tdd: tddFlag, skipAcceptanceReview: skipAcceptanceReviewFlag },
-  ({ issueId, tdd, skipAcceptanceReview }) =>
+  {
+    issueId: issueIdArg,
+    tdd: tddFlag,
+    skipAcceptanceReview: skipAcceptanceReviewFlag,
+    maxIterations: maxIterationsOption,
+  },
+  ({ issueId, tdd, skipAcceptanceReview, maxIterations }) =>
     runWorkflowCommand({
       workflow: workflowFor("implement"),
-      input: implementInput({ issueId, tdd, skipAcceptanceReview }),
+      input: implementInput({ issueId, tdd, skipAcceptanceReview, maxIterations }),
     }),
 ).pipe(
   Command.withDescription("Implement a Linear issue on a dedicated branch."),
@@ -222,14 +254,20 @@ const implement = Command.make(
 
 const ship = Command.make(
   "ship",
-  { issueId: issueIdArg, base: baseOption, tdd: tddFlag, skipAcceptanceReview: skipAcceptanceReviewFlag },
-  ({ issueId, base, tdd, skipAcceptanceReview }) =>
+  {
+    issueId: issueIdArg,
+    base: baseOption,
+    tdd: tddFlag,
+    skipAcceptanceReview: skipAcceptanceReviewFlag,
+    maxIterations: maxIterationsOption,
+  },
+  ({ issueId, base, tdd, skipAcceptanceReview, maxIterations }) =>
     runWorkflowCommand({
       workflow: workflowFor("ship"),
-      input: shipInput({ issueId, base, tdd, skipAcceptanceReview }),
+      input: shipInput({ issueId, base, tdd, skipAcceptanceReview, maxIterations }),
     }),
 ).pipe(
-  Command.withDescription("Implement a Linear issue, open a PR, and drive review to approval."),
+  Command.withDescription("Implement a Linear issue (with a local review pass), open a PR, and settle its CI and comments."),
 );
 
 const dev = Command.make(
@@ -330,10 +368,17 @@ const stackBuild = Command.make(
     allRepos: allReposOption,
     detach: detachOption,
     skipAcceptanceReview: skipAcceptanceReviewFlag,
+    maxIterations: maxIterationsOption,
   },
-  ({ feature, repo, allRepos, detach, skipAcceptanceReview }) =>
+  ({ feature, repo, allRepos, detach, skipAcceptanceReview, maxIterations }) =>
     toEffect(() =>
-      runStackBuild(stackContext(feature), { repo: optionValue(repo), allRepos, detach, skipAcceptanceReview }),
+      runStackBuild(stackContext(feature), {
+        repo: optionValue(repo),
+        allRepos,
+        detach,
+        skipAcceptanceReview,
+        maxIterations,
+      }),
     ),
 ).pipe(
   Command.withDescription("Build entries locally, bottom to top. Resumable. --all-repos fans out per repo (parallel); --repo <key> builds one; --detach runs in the background. --skip-acceptance-review builds without the local review step (ORs with the map's plan-time default)."),
@@ -368,19 +413,14 @@ const stackPush = Command.make(
 
 const stackReview = Command.make(
   "review",
-  { feature: featureOption, repo: repoKeyOption, allRepos: allReposOption, reviewers: reviewersOption, detach: detachOption },
-  ({ feature, repo, allRepos, reviewers, detach }) =>
+  { feature: featureOption, repo: repoKeyOption, allRepos: allReposOption, detach: detachOption },
+  ({ feature, repo, allRepos, detach }) =>
     toEffect(() =>
-      runStackReview(stackContext(feature), {
-        repo: optionValue(repo),
-        allRepos,
-        reviewers: reviewers.split(",").map((handle) => handle.trim()).filter((handle) => handle.length > 0),
-        detach,
-      }),
+      runStackReview(stackContext(feature), { repo: optionValue(repo), allRepos, detach }),
     ),
 ).pipe(
   Command.withDescription(
-    "Drive open stacked PRs to all-reviewers-approved: read findings across the stack, fix each in its owning branch via jj (cascade up), push, re-request, and loop. NEVER merges. --all-repos / --repo <key> for multi-repo; --detach to background.",
+    "Settle the open stacked PRs against CI and human review comments: read each PR's checks and comments, fix what they raise in its owning branch via jj (cascade up), and push. NEVER merges. --all-repos / --repo <key> for multi-repo; --detach to background.",
   ),
 );
 
@@ -442,7 +482,7 @@ const prFix = Command.make(
     }),
 ).pipe(
   Command.withDescription(
-    "Address the existing review findings on a PR once and push — no loop, no re-request. Defaults to the current branch's PR. NEVER merges.",
+    "Address the existing review findings on a PR once and push — no loop, nothing posted back. Defaults to the current branch's PR. NEVER merges.",
   ),
 );
 
@@ -474,7 +514,7 @@ const prRefine = Command.make(
   },
 ).pipe(
   Command.withDescription(
-    "Drive a PR to all-AI-approved: trigger reviewers, fix findings, re-request, and loop. Defaults to the current branch's PR; --branch opens a new PR first. NEVER merges.",
+    "Settle a PR against CI and human review comments: read its checks and comments, fix what they raise, and push. Defaults to the current branch's PR; --branch opens a new PR first. NEVER merges.",
   ),
 );
 
@@ -482,7 +522,7 @@ const pr = Command.make("pr", {}, () =>
   Console.log("Run `xiv pr --help` to list PR subcommands."),
 ).pipe(
   Command.withDescription(
-    "Work with pull requests: `review` (one-off interactive review), `fix` (address findings once), `refine` (loop to AI approval).",
+    "Work with pull requests: `review` (one-off interactive review), `fix` (address findings once), `refine` (settle CI + human comments).",
   ),
   Command.withSubcommands([prReview, prFix, prRefine]),
 );
