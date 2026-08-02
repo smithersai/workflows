@@ -1,4 +1,4 @@
-import { type AgentLike, ClaudeCodeAgent, CodexAgent } from "smithers-orchestrator";
+import { type AgentLike, ClaudeCodeAgent, CodexAgent } from "smthrs";
 import type { ModelName, ReasoningEffort } from "./types";
 
 const cwd = process.env.SMITHERS_TARGET_CWD ?? process.cwd();

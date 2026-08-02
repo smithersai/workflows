@@ -4,8 +4,8 @@
 // smithers-description: Publish the next N built stack entries as stacked PRs, and re-sync open PRs that a later amend re-flowed. NEVER merges.
 // smithers-tags: github, stack, pr
 // smithers-aliases: spush
-/** @jsxImportSource smithers-orchestrator */
-import { createSmithers } from "smithers-orchestrator";
+/** @jsxImportSource smthrs */
+import { createSmithers } from "smthrs";
 import { z } from "zod/v4";
 import { prOpenSchema } from "../components/PrReview";
 import {

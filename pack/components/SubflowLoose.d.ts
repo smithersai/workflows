@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import type { OutputTarget } from "smithers-orchestrator";
+import type { OutputTarget } from "smthrs";
 
 export interface SubflowLooseProps {
   readonly id: string;

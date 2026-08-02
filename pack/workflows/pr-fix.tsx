@@ -4,8 +4,8 @@
 // smithers-description: Address the existing review findings on a PR once and push — no loop, nothing posted back. NEVER merges.
 // smithers-tags: github, review, pr, fix
 // smithers-aliases: prf
-/** @jsxImportSource smithers-orchestrator */
-import { createSmithers } from "smithers-orchestrator";
+/** @jsxImportSource smthrs */
+import { createSmithers } from "smthrs";
 import { z } from "zod/v4";
 import { agents } from "../agents";
 import { addressFindingsSchema } from "../components/PrReview";

@@ -4,8 +4,8 @@
 // smithers-description: Build every pending stack entry on its own branch, bottom to top, locally (no push). Resumable — already-built entries are skipped.
 // smithers-tags: linear, stack, coding
 // smithers-aliases: sb
-/** @jsxImportSource smithers-orchestrator */
-import { createSmithers } from "smithers-orchestrator";
+/** @jsxImportSource smthrs */
+import { createSmithers } from "smthrs";
 import { z } from "zod/v4";
 import { SubflowLoose } from "../components/SubflowLoose.js";
 import { finalizeSchema } from "../components/LinearIssue";

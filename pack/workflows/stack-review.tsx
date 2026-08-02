@@ -4,8 +4,8 @@
 // smithers-description: Read CI status and human review comments across a stacked-PR feature, fix what they raise in each finding's OWNING branch via jj (cascade up), push, and report. NEVER merges.
 // smithers-tags: github, review, pr, stack, jj, ci
 // smithers-aliases: sr
-/** @jsxImportSource smithers-orchestrator */
-import { createSmithers, Loop } from "smithers-orchestrator";
+/** @jsxImportSource smthrs */
+import { createSmithers, Loop } from "smthrs";
 import { z } from "zod/v4";
 import { agents } from "../agents";
 import {

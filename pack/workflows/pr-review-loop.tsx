@@ -4,8 +4,8 @@
 // smithers-description: Open or attach to a PR, read its CI status and human review comments, address what they raise, and report. NEVER merges.
 // smithers-tags: github, review, pr, ci
 // smithers-aliases: prl
-/** @jsxImportSource smithers-orchestrator */
-import { createSmithers, Loop } from "smithers-orchestrator";
+/** @jsxImportSource smthrs */
+import { createSmithers, Loop } from "smthrs";
 import { z } from "zod/v4";
 import { agents } from "../agents";
 import {

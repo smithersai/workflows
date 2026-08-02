@@ -4,8 +4,8 @@
 // smithers-description: Fetch a Linear project or parent issue, assign each issue to a repo, order each repo's issues into a substack, and write the stack map. No code changes.
 // smithers-tags: linear, stack, planning
 // smithers-aliases: sp
-/** @jsxImportSource smithers-orchestrator */
-import { createSmithers } from "smithers-orchestrator";
+/** @jsxImportSource smthrs */
+import { createSmithers } from "smthrs";
 import { z } from "zod/v4";
 import { stackPlanAgent } from "../agents";
 import { createStackMap, saveStackMap, type StackEntry } from "../lib/stack-map";

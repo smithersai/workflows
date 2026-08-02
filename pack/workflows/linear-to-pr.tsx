@@ -4,8 +4,8 @@
 // smithers-description: Implement a Linear issue (with a local review pass), then open a PR and settle its CI status and human comments. NEVER merges.
 // smithers-tags: linear, github, coding, review
 // smithers-aliases: l2pr
-/** @jsxImportSource smithers-orchestrator */
-import { createSmithers } from "smithers-orchestrator";
+/** @jsxImportSource smthrs */
+import { createSmithers } from "smthrs";
 import { z } from "zod/v4";
 import { SubflowLoose } from "../components/SubflowLoose.js";
 import { finalizeSchema } from "../components/LinearIssue";

@@ -4,8 +4,8 @@
 // smithers-description: Apply a change to one stack entry and let jj re-flow it through every descendant, then re-validate the tip. Local only.
 // smithers-tags: linear, stack, jj, restack
 // smithers-aliases: sa
-/** @jsxImportSource smithers-orchestrator */
-import { createSmithers } from "smithers-orchestrator";
+/** @jsxImportSource smthrs */
+import { createSmithers } from "smthrs";
 import { z } from "zod/v4";
 import { validateOutputSchema } from "../components/ValidationLoop";
 import {

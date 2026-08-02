@@ -4,8 +4,8 @@
 // smithers-description: Take a Linear issue, plan it, implement it, and review against acceptance criteria with meaningful tests + evidence.
 // smithers-tags: linear, coding, review
 // smithers-aliases: li
-/** @jsxImportSource smithers-orchestrator */
-import { createSmithers, Loop } from "smithers-orchestrator";
+/** @jsxImportSource smthrs */
+import { createSmithers, Loop } from "smthrs";
 import { z } from "zod/v4";
 import { linearImplementAgents } from "../agents";
 import { finalizeSchema, linearIssueSchema, type LinearIssue } from "../components/LinearIssue";

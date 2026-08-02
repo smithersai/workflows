@@ -1,5 +1,5 @@
-/** @jsxImportSource smithers-orchestrator */
-import { Loop, Sequence, Task, type AgentLike } from "smithers-orchestrator";
+/** @jsxImportSource smthrs */
+import { Loop, Sequence, Task, type AgentLike } from "smthrs";
 import { z } from "zod/v4";
 import ImplementPrompt from "~/prompts/implement.mdx";
 import ValidatePrompt from "~/prompts/validate.mdx";
